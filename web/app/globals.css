@@ -1,0 +1,24 @@
+@import "tailwindcss";
+@import "@mandate/ui/tokens.css";
+
+@theme inline {
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", monospace;
+}
+
+body {
+  font-feature-settings:
+    "cv02",
+    "cv03",
+    "cv04",
+    "cv11";
+}
+
+/* @xyflow/react ships its own baseline CSS; override just enough to sit inside our dark surface
+   rather than importing its default (light, blue-accented) theme. */
+.react-flow {
+  background-color: var(--color-base);
+}
+.react-flow__attribution {
+  display: none;
+}
