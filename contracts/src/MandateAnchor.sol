@@ -268,6 +268,17 @@ contract MandateAnchor is Ownable2Step, EIP712 {
         }
     }
 
+    /// @notice The two fields `AgentTreasury` needs for its own leaky-bucket budget ledger,
+    ///         without hand-destructuring `anchors`'s full 9-field tuple at every call site.
+    function budgetOf(address agent)
+        external
+        view
+        returns (uint128 budgetTotal, uint32 budgetPeriod)
+    {
+        Anchor storage anchor = anchors[agent];
+        return (anchor.budgetTotal, anchor.budgetPeriod);
+    }
+
     /*//////////////////////////////////////////////////////////////
                     INTERNAL READ-ONLY FUNCTIONS
     //////////////////////////////////////////////////////////////*/
