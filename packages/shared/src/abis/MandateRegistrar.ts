@@ -859,6 +859,22 @@ export const MandateRegistrarAbi = [
   },
   {
     "type": "error",
+    "name": "MandateRegistrar__BudgetBelowCommitted",
+    "inputs": [
+      {
+        "name": "requested",
+        "type": "uint128",
+        "internalType": "uint128"
+      },
+      {
+        "name": "committed",
+        "type": "uint128",
+        "internalType": "uint128"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "MandateRegistrar__BudgetExceedsHeadroom",
     "inputs": [
       {
