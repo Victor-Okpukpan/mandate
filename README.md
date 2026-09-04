@@ -49,18 +49,20 @@ git clone <this repo>
 cd mandate
 pnpm install
 cp .env.example .env   # every value is a public default or empty — see the file's own comments
-ln -s ../.env landing/.env.local && ln -s ../.env web/.env.local
-# Next.js only reads env files from its own app directory, never a monorepo root — the symlinks
-# are what let landing/ and web/ actually see the single root .env instead of each needing a copy.
+# Root .env covers the whole monorepo (contracts, enforcer, agents). Next.js only reads env files
+# from its own app directory, so each frontend keeps its own small subset instead of the whole
+# file: landing/ needs none (its two vars both have working fallbacks in code); web/ has its own
+# web/.env.local with just the NEXT_PUBLIC_* vars it actually reads — update it by hand alongside
+# the root .env whenever a deployed address changes.
 
 # Contracts
 cd contracts && forge build --sizes && forge test -vvv
 forge test --fork-url https://ethereum-sepolia-rpc.publicnode.com --match-path 'test/fork/*' -vvv
 
 # Frontends
-cd ../landing && pnpm dev   # runmandate.xyz locally
+cd ../landing && pnpm dev   # runmandate.xyz locally — needs no env file at all
 cd ../web && pnpm dev        # app.runmandate.xyz locally — renders a "not yet deployed" state
-                               # until NEXT_PUBLIC_MANDATE_REGISTRAR etc. are set
+                               # until web/.env.local's NEXT_PUBLIC_MANDATE_REGISTRAR etc. are set
 ```
 
 Nothing in this repo has been deployed yet — every contract address in `.env.example` is either a
