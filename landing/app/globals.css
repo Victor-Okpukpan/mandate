@@ -1,0 +1,19 @@
+@import "tailwindcss";
+@import "@mandate/ui/tokens.css";
+
+@theme inline {
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", monospace;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-feature-settings:
+    "cv02",
+    "cv03",
+    "cv04",
+    "cv11";
+}

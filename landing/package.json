@@ -1,0 +1,28 @@
+{
+  "name": "@mandate/landing",
+  "version": "0.0.0",
+  "private": true,
+  "description": "MANDATE's landing page and per-sponsor docs — runmandate.xyz.",
+  "license": "MIT",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@mandate/ui": "workspace:*",
+    "geist": "^1.7.2",
+    "next": "^16.3.4",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/node": "^22.10.2",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.7",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^5.7.3"
+  }
+}
