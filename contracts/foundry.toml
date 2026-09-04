@@ -5,13 +5,17 @@ libs = ["lib"]
 solc = "0.8.34"
 optimizer = true
 optimizer_runs = 200
-via_ir = false
+# 0.8.34+ only — 0.8.28-0.8.33 have a transient-storage IR bug where via-ir can emit sstore
+# instead of tstore (and vice versa) when clearing storage. Needed here: MandateRegistrar's
+# _issue() has enough locals to hit "stack too deep" without it.
+via_ir = true
 fs_permissions = [{ access = "read", path = "./" }]
 
 remappings = [
   "forge-std/=lib/forge-std/src/",
   "openzeppelin-contracts/=lib/openzeppelin-contracts/contracts/",
   "contracts/=src/",
+  "contracts-test/=test/",
 ]
 
 [fuzz]

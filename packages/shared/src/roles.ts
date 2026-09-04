@@ -71,9 +71,19 @@ export const ROOT_RESOURCE = 0n;
 export const MANDATE_REGISTRY_ROLE_BITMAP = 0n;
 
 /**
- * The resolver-instance admin bitmap granted to `MandateRegistrar` at `initialize()` — root-scoped
+ * The resolver-instance root bitmap granted to `MandateRegistrar` at `initialize()` — root-scoped
  * on THIS resolver instance only, so it never leaks authority over any other agent's resolver.
- * Lets the registrar later call `authorizeTextRoles`/`setText` for amendments without re-granting.
+ * Includes both the ADMIN bits (to call `authorizeTextRoles`/`authorizeAddrRoles`/
+ * `authorizeDataRoles` for later amendments) and the regular bits (to call `setText`/`setAddr`/
+ * `setData` directly, e.g. `bindIdentity`'s post-issuance ERC-8004 write) — the admin variant
+ * alone only grants the right to delegate the permission to someone else, not to hold it.
  */
-export const MANDATE_RESOLVER_ADMIN_ROLE_BITMAP =
-  ROLE_SET_TEXT_ADMIN | ROLE_SET_ADDR_ADMIN | ROLE_SET_DATA_ADMIN | ROLE_UPGRADE | ROLE_UPGRADE_ADMIN;
+export const MANDATE_RESOLVER_ROOT_ROLE_BITMAP =
+  ROLE_SET_TEXT |
+  ROLE_SET_TEXT_ADMIN |
+  ROLE_SET_ADDR |
+  ROLE_SET_ADDR_ADMIN |
+  ROLE_SET_DATA |
+  ROLE_SET_DATA_ADMIN |
+  ROLE_UPGRADE |
+  ROLE_UPGRADE_ADMIN;
