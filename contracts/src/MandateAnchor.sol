@@ -9,7 +9,7 @@ import { MerkleProof } from "openzeppelin-contracts/utils/cryptography/MerklePro
 
 /// @title MandateAnchor
 /// @author Victor Okpukpan (@victorokpukpan_)
-/// @custom:security-contact security@runmandate.xyz
+/// @custom:security-contact https://x.com/victorokpukpan_
 /// @notice The Arc-side shadow of ENS mandate state, written only by the Enforcer's key via
 ///         EIP-712 signed payloads. `assertSpend` is the gate every spend on Arc must pass —
 ///         and it fails closed: a dead or censored Enforcer freezes every agent instead of

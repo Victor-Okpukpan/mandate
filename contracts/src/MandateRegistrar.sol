@@ -17,7 +17,7 @@ import { MandateKeys } from "contracts/libraries/MandateKeys.sol";
 
 /// @title MandateRegistrar
 /// @author Victor Okpukpan (@victorokpukpan_)
-/// @custom:security-contact security@runmandate.xyz
+/// @custom:security-contact https://x.com/victorokpukpan_
 /// @notice Issues, attenuates, amends, and revokes AI-agent mandates as ENSv2 subnames. A mandate
 ///         is a soulbound, self-expiring, instantly-revocable ENS name whose resolver records
 ///         encode its principal-controlled budget/allowlist/expiry terms — and whose per-key

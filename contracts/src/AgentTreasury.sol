@@ -15,7 +15,7 @@ import { MandateAnchor } from "contracts/MandateAnchor.sol";
 
 /// @title AgentTreasury
 /// @author Victor Okpukpan (@victorokpukpan_)
-/// @custom:security-contact security@runmandate.xyz
+/// @custom:security-contact https://x.com/victorokpukpan_
 /// @notice The org's USDC pool on Arc, structured as a revolving credit facility. Agents never
 ///         hold float beyond a small gas draw; they pull directly from the pool to pay a
 ///         counterparty, checked against `MandateAnchor` on every spend, and the pool's

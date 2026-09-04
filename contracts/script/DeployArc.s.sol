@@ -11,7 +11,7 @@ import { MandateAnchor } from "contracts/MandateAnchor.sol";
 
 /// @title DeployArc
 /// @author Victor Okpukpan (@victorokpukpan_)
-/// @custom:security-contact security@runmandate.xyz
+/// @custom:security-contact https://x.com/victorokpukpan_
 /// @notice Deploys `MandateAnchor` and `AgentTreasury` on Arc testnet 5042002, wired against the
 ///         sponsor's own deployed USDC and ERC-8183 Jobs contracts. Does not touch Sepolia and
 ///         does not sync any mandate — that is the Enforcer's job once it is actually running

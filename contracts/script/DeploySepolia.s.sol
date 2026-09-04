@@ -11,7 +11,7 @@ import { MandateRegistrar } from "contracts/MandateRegistrar.sol";
 
 /// @title DeploySepolia
 /// @author Victor Okpukpan (@victorokpukpan_)
-/// @custom:security-contact security@runmandate.xyz
+/// @custom:security-contact https://x.com/victorokpukpan_
 /// @notice Deploys `MandateRegistrar` against the real ENSv2 Sepolia beta, then registers the
 ///         org's own 2LD via `ETHRegistrar`'s MockUSDC commit-reveal flow — wiring the freshly
 ///         deployed registrar's own `ORG_ROOT_REGISTRY` as that name's subregistry in the same

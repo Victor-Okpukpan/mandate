@@ -7,7 +7,7 @@ import { MandateRegistrar } from "contracts/MandateRegistrar.sol";
 
 /// @title SeedDemo
 /// @author Victor Okpukpan (@victorokpukpan_)
-/// @custom:security-contact security@runmandate.xyz
+/// @custom:security-contact https://x.com/victorokpukpan_
 /// @notice Issues two demo mandates — "research" and "ops", matching the naming already used
 ///         throughout the test suite and the landing page's own hero replay — against an
 ///         already-deployed `MandateRegistrar` on Sepolia. Deliberately Sepolia-only: a single
