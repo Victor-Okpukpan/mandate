@@ -49,6 +49,9 @@ git clone <this repo>
 cd mandate
 pnpm install
 cp .env.example .env   # every value is a public default or empty — see the file's own comments
+ln -s ../.env landing/.env.local && ln -s ../.env web/.env.local
+# Next.js only reads env files from its own app directory, never a monorepo root — the symlinks
+# are what let landing/ and web/ actually see the single root .env instead of each needing a copy.
 
 # Contracts
 cd contracts && forge build --sizes && forge test -vvv
