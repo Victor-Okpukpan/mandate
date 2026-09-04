@@ -310,6 +310,7 @@ contract MandateRegistrar is Ownable2Step, ReentrancyGuardTransient {
     ///      non-root mandate — an amendment can never grant itself more room than a fresh
     ///      `attenuate` call could. `allowlistRoot` is silently forced back to the parent's current
     ///      root for a non-root mandate, same as `attenuate`.
+    // solhint-disable-next-line function-max-lines
     function amendMandate(bytes32 node, MandateTerms calldata terms) external nonReentrant {
         Mandate storage mandate = _mandateOrRevert(node);
         if (mandate.revoked) revert MandateRegistrar__MandateRevoked(node);
@@ -454,6 +455,7 @@ contract MandateRegistrar is Ownable2Step, ReentrancyGuardTransient {
     ///      why those can't share the same batch), registers the name with a zero registry-level
     ///      roleBitmap (soulbound, non-renewable-by-the-agent by omission), and mirrors the mandate
     ///      into storage. Still one on-chain transaction end to end, just not one `initialize()` call.
+    // solhint-disable-next-line function-max-lines
     function _issue(
         bytes32 parentNode,
         IUserRegistry registry,
