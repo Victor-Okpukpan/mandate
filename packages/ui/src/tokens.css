@@ -1,0 +1,221 @@
+/**
+ * MANDATE design tokens — shared by landing/ and web/.
+ *
+ * Dark-first: the bare :root values ARE the dark palette (the product's primary, default
+ * register — a live state graph read by expert judges, not a marketing site). Light overrides
+ * live under [data-theme="light"] and prefers-color-scheme:light, in that order of precedence.
+ *
+ * Two tiers:
+ *   1. Raw palette (--mandate-*) — never referenced directly outside this file.
+ *   2. Semantic tokens, fed into Tailwind's @theme below so `bg-surface`, `text-primary`,
+ *      `text-live`, etc. exist as utilities that resolve through these swappable variables.
+ *
+ * The four state colors (live / expiring / revoked / stale) are the ONLY saturated color in the
+ * system — the graph's own vocabulary, reused everywhere (badges, ledger rows, docs diagrams)
+ * rather than invented per-surface. Everything else is near-neutral.
+ */
+
+:root {
+  color-scheme: dark;
+
+  /* -- raw palette (dark) -- */
+  --mandate-bg-0: #08090b;
+  --mandate-bg-1: #0d0f12;
+  --mandate-bg-2: #131519;
+  --mandate-bg-3: #1a1d22;
+  --mandate-border-0: #1e2126;
+  --mandate-border-1: #2a2e35;
+  --mandate-border-2: #3a3f48;
+  --mandate-text-0: #f2f3f5;
+  --mandate-text-1: #c7cad1;
+  --mandate-text-2: #8b8f99;
+  --mandate-text-3: #5c606a;
+
+  --mandate-accent-0: #dcecff;
+  --mandate-accent-1: #6fa8ff;
+  --mandate-accent-2: #3d7dff;
+  --mandate-accent-3: #2a5ecc;
+
+  --mandate-live-0: #d3fbe8;
+  --mandate-live-1: #34d399;
+  --mandate-live-2: #16a877;
+  --mandate-expiring-0: #fdecc8;
+  --mandate-expiring-1: #f2b33d;
+  --mandate-expiring-2: #c98a1f;
+  --mandate-revoked-0: #fbdbdb;
+  --mandate-revoked-1: #f2555f;
+  --mandate-revoked-2: #c93340;
+  --mandate-stale-0: #e3e2f0;
+  --mandate-stale-1: #8b8fc7;
+  --mandate-stale-2: #62658f;
+
+  /* -- semantic tokens -- */
+  --bg-base: var(--mandate-bg-0);
+  --bg-surface: var(--mandate-bg-1);
+  --bg-surface-2: var(--mandate-bg-2);
+  --bg-surface-3: var(--mandate-bg-3);
+  --bg-overlay: color-mix(in oklab, var(--mandate-bg-0) 72%, transparent);
+
+  --border-subtle: var(--mandate-border-0);
+  --border-default: var(--mandate-border-1);
+  --border-strong: var(--mandate-border-2);
+
+  --text-primary: var(--mandate-text-0);
+  --text-secondary: var(--mandate-text-1);
+  --text-tertiary: var(--mandate-text-2);
+  --text-disabled: var(--mandate-text-3);
+  --text-on-accent: #061021;
+
+  --accent-subtle: var(--mandate-accent-0);
+  --accent: var(--mandate-accent-1);
+  --accent-strong: var(--mandate-accent-2);
+  --accent-pressed: var(--mandate-accent-3);
+
+  --live-subtle: var(--mandate-live-0);
+  --live: var(--mandate-live-1);
+  --live-strong: var(--mandate-live-2);
+  --expiring-subtle: var(--mandate-expiring-0);
+  --expiring: var(--mandate-expiring-1);
+  --expiring-strong: var(--mandate-expiring-2);
+  --revoked-subtle: var(--mandate-revoked-0);
+  --revoked: var(--mandate-revoked-1);
+  --revoked-strong: var(--mandate-revoked-2);
+  --stale-subtle: var(--mandate-stale-0);
+  --stale: var(--mandate-stale-1);
+  --stale-strong: var(--mandate-stale-2);
+
+  --shadow-color: 220 40% 2%;
+  --focus-ring: var(--mandate-accent-1);
+}
+
+/**
+ * Dark is the committed default — not merely "dark when the OS agrees." A judge loading this on a
+ * light-mode laptop should still see the product's actual identity, the same way Datadog or
+ * Grafana don't reshuffle their palette to match the visitor's OS. Light is reserved for an
+ * explicit [data-theme="light"] toggle (not yet built) — no prefers-color-scheme fallback here.
+ */
+[data-theme="light"] {
+  color-scheme: light;
+
+  --mandate-bg-0: #fbfbfc;
+  --mandate-bg-1: #ffffff;
+  --mandate-bg-2: #f2f3f5;
+  --mandate-bg-3: #e8e9ec;
+  --mandate-border-0: #e7e8eb;
+  --mandate-border-1: #d7d9de;
+  --mandate-border-2: #c1c4cc;
+  --mandate-text-0: #14161a;
+  --mandate-text-1: #3a3d44;
+  --mandate-text-2: #6b6f79;
+  --mandate-text-3: #9a9ea8;
+
+  --mandate-accent-0: #eaf2ff;
+  --mandate-accent-1: #2a68e0;
+  --mandate-accent-2: #1e4fb8;
+  --mandate-accent-3: #163d8f;
+
+  --mandate-live-0: #e3faf0;
+  --mandate-live-1: #0f9d6e;
+  --mandate-live-2: #0b7d58;
+  --mandate-expiring-0: #fdf3dd;
+  --mandate-expiring-1: #b3790f;
+  --mandate-expiring-2: #8f5f0a;
+  --mandate-revoked-0: #fdecec;
+  --mandate-revoked-1: #d5323d;
+  --mandate-revoked-2: #ab2530;
+  --mandate-stale-0: #edecf7;
+  --mandate-stale-1: #5c5f96;
+  --mandate-stale-2: #46496f;
+
+  --text-on-accent: #ffffff;
+  --shadow-color: 220 20% 60%;
+}
+
+@theme inline {
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", monospace;
+
+  --color-base: var(--bg-base);
+  --color-surface: var(--bg-surface);
+  --color-surface-2: var(--bg-surface-2);
+  --color-surface-3: var(--bg-surface-3);
+  --color-overlay: var(--bg-overlay);
+
+  --color-border-subtle: var(--border-subtle);
+  --color-border: var(--border-default);
+  --color-border-strong: var(--border-strong);
+
+  --color-primary: var(--text-primary);
+  --color-secondary: var(--text-secondary);
+  --color-tertiary: var(--text-tertiary);
+  --color-disabled: var(--text-disabled);
+  --color-on-accent: var(--text-on-accent);
+
+  --color-accent-subtle: var(--accent-subtle);
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-pressed: var(--accent-pressed);
+
+  --color-live-subtle: var(--live-subtle);
+  --color-live: var(--live);
+  --color-live-strong: var(--live-strong);
+  --color-expiring-subtle: var(--expiring-subtle);
+  --color-expiring: var(--expiring);
+  --color-expiring-strong: var(--expiring-strong);
+  --color-revoked-subtle: var(--revoked-subtle);
+  --color-revoked: var(--revoked);
+  --color-revoked-strong: var(--revoked-strong);
+  --color-stale-subtle: var(--stale-subtle);
+  --color-stale: var(--stale);
+  --color-stale-strong: var(--stale-strong);
+
+  --animate-pulse-live: pulse-live 2.4s ease-in-out infinite;
+  --animate-fade-in: fade-in 0.4s ease-out both;
+  --animate-rise-in: rise-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+
+  @keyframes pulse-live {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.55;
+    }
+  }
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes rise-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+  body {
+    background-color: var(--color-base);
+    color: var(--color-primary);
+  }
+  ::selection {
+    background-color: var(--accent-subtle);
+    color: var(--text-on-accent);
+  }
+  :focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+}
