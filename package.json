@@ -1,0 +1,24 @@
+{
+  "name": "mandate",
+  "private": true,
+  "description": "ENS subnames as revocable, self-expiring mandates for AI agents, enforced on Arc.",
+  "license": "MIT",
+  "author": "Victor Okpukpan",
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "lint": "pnpm -r --if-present run lint",
+    "build": "pnpm -r --if-present run build",
+    "test": "pnpm -r --if-present run test",
+    "format": "prettier --write .",
+    "contracts:build": "cd contracts && forge build --sizes",
+    "contracts:test": "cd contracts && forge test -vvv",
+    "contracts:test:fork": "cd contracts && forge test --fork-url $SEPOLIA_RPC_URL --match-path 'test/fork/*' -vvv"
+  },
+  "devDependencies": {
+    "prettier": "^3.4.2",
+    "typescript": "^5.7.3"
+  }
+}

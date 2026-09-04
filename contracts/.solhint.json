@@ -1,0 +1,16 @@
+{
+  "extends": "solhint:recommended",
+  "rules": {
+    "compiler-version": ["error", "0.8.34"],
+    "func-visibility": ["error", { "ignoreConstructors": true }],
+    "reason-string": "off",
+    "custom-errors": "error",
+    "no-console": "error",
+    "no-global-import": "error",
+    "gas-custom-errors": "error",
+    "immutable-vars-naming": ["warn", { "immutablesAsConstants": true }],
+    "not-rely-on-time": "off",
+    "max-line-length": ["warn", 120],
+    "no-empty-blocks": "warn"
+  }
+}

@@ -1,0 +1,44 @@
+# --- Planning docs (never tracked) ---
+mandate.md
+SPONSOR-NOTES.md
+
+# --- Node / pnpm ---
+node_modules/
+.pnpm-store/
+dist/
+build/
+.turbo/
+*.tsbuildinfo
+
+# --- Next.js ---
+.next/
+out/
+.vercel/
+
+# --- Foundry ---
+contracts/cache/
+contracts/out/
+contracts/broadcast/*/31337/
+contracts/broadcast/**/dry-run/
+
+# --- Env / secrets ---
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# --- OS / editor ---
+.DS_Store
+*.swp
+.vscode/*
+!.vscode/extensions.json
+
+# --- Logs ---
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# --- Misc ---
+.claude/settings.local.json
+coverage/

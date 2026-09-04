@@ -1,0 +1,62 @@
+name: contracts
+
+on:
+  push:
+    branches: [main]
+    paths: ["contracts/**", ".github/workflows/contracts.yml"]
+  pull_request:
+    paths: ["contracts/**", ".github/workflows/contracts.yml"]
+
+defaults:
+  run:
+    working-directory: contracts
+
+jobs:
+  build-and-test:
+    strategy:
+      matrix:
+        task: [build, test, fork-test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: forge build --sizes
+        if: matrix.task == 'build'
+        run: forge build --sizes
+
+      - name: forge test
+        if: matrix.task == 'test'
+        run: forge test -vvv
+
+      - name: forge test (Sepolia fork)
+        if: matrix.task == 'fork-test'
+        run: forge test --fork-url https://ethereum-sepolia-rpc.publicnode.com --match-path 'test/fork/*' -vvv
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: foundry-rs/foundry-toolchain@v1
+      - name: forge fmt --check
+        run: forge fmt --check
+      - name: solhint
+        run: npx solhint 'src/**/*.sol'
+
+  static-analysis:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: foundry-rs/foundry-toolchain@v1
+      - name: Install slither
+        run: pip install slither-analyzer
+      - name: slither
+        run: slither . --config-file slither.config.json || true

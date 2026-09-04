@@ -1,0 +1,6 @@
+packages:
+  - "packages/*"
+  - "landing"
+  - "web"
+  - "enforcer"
+  - "agents/*"
