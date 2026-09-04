@@ -4,8 +4,12 @@ import { use } from "react";
 import { useReadContract, useReadContracts } from "wagmi";
 import { sepolia, arcTestnet } from "viem/chains";
 import type { Hex } from "viem";
-import { MandateRegistrarAbi, MandateAnchorAbi, AgentTreasuryAbi } from "@mandate/shared/abis";
-import { PermissionedResolverAbi } from "../../../lib/permissionedResolverAbi";
+import {
+  MandateRegistrarAbi,
+  MandateAnchorAbi,
+  AgentTreasuryAbi,
+  PermissionedResolverAbi,
+} from "@mandate/shared/abis";
 import { Card } from "@mandate/ui/components/Card";
 import { MonoValue } from "@mandate/ui/components/MonoValue";
 import { getDeployedAddresses, isDeployed } from "../../../lib/addresses";

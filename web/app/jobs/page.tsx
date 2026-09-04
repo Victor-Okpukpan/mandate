@@ -3,7 +3,7 @@
 import { useReadContract } from "wagmi";
 import { arcTestnet } from "viem/chains";
 import type { Address } from "viem";
-import { JobsAbi } from "../../lib/jobsAbi";
+import { JobsAbi } from "@mandate/shared/abis";
 import { Card } from "@mandate/ui/components/Card";
 import { MonoValue } from "@mandate/ui/components/MonoValue";
 
