@@ -42,7 +42,20 @@ import { MandateKeys } from "contracts/libraries/MandateKeys.sol";
 ///        proving one merkle root is a subset of another on-chain is expensive; inheriting makes
 ///        widening structurally impossible instead of merely checked. `attenuate` and
 ///        `amendMandate` silently overwrite any caller-supplied `allowlistRoot` for a non-root
-///        mandate with its parent's — this is enforcement, not a bug to work around.
+///        mandate with its parent's — and, for a root-level mandate with no parent to force it
+///        from, `amendMandate` forces it back to its own current value instead — so it is exactly
+///        as immutable post-issuance everywhere in the tree. This is enforcement, not a bug to
+///        work around.
+///      - `amendMandate` shrinking a mandate's `expiry` or `perTxCap` does NOT cascade to that
+///        mandate's already-issued children — there is no on-chain children index to walk (only
+///        the running `committed` sum, which amendment DOES re-check against). A child keeps
+///        spending under its own stored, now-stale-relative-to-its-tightened-parent cap until it is
+///        itself re-amended or revoked directly. `allowlistRoot` immutability and the
+///        `committed <= budgetTotal` ceiling are perpetually enforced on-chain (an invariant run
+///        caught both missing before this note was added); numeric narrowing is currently a
+///        point-in-time check only. See ARCHITECTURE.md's known-limitations section for why the
+///        real fix belongs in the Enforcer, which already has the full parent→children graph from
+///        indexing `MandateIssued` events to sync Arc.
 contract MandateRegistrar is Ownable2Step, ReentrancyGuardTransient {
     using Strings for uint256;
     using Strings for address;
@@ -163,6 +176,7 @@ contract MandateRegistrar is Ownable2Step, ReentrancyGuardTransient {
     error MandateRegistrar__PerTxCapExceedsParent(uint128 requested, uint128 parentCap);
     error MandateRegistrar__BudgetExceedsHeadroom(uint128 requested, uint128 headroom);
     error MandateRegistrar__AgentGrantFailed(address agentWallet);
+    error MandateRegistrar__BudgetBelowCommitted(uint128 requested, uint128 committed);
 
     /*//////////////////////////////////////////////////////////////
                               INITIALIZATION
@@ -309,7 +323,13 @@ contract MandateRegistrar is Ownable2Step, ReentrancyGuardTransient {
     /// @dev Re-validates the full narrowing invariant against the parent's CURRENT headroom for a
     ///      non-root mandate — an amendment can never grant itself more room than a fresh
     ///      `attenuate` call could. `allowlistRoot` is silently forced back to the parent's current
-    ///      root for a non-root mandate, same as `attenuate`.
+    ///      root for a non-root mandate, same as `attenuate` — and, for a root-level mandate with
+    ///      no parent to force it from, forced back to its OWN current value instead, so it is
+    ///      exactly as immutable post-issuance as every descendant's inherited copy of it (an
+    ///      admin who could freely change it here would silently orphan every already-issued
+    ///      descendant's inherited root, since amendment never cascades down the tree). Also
+    ///      re-checked against this mandate's OWN `committed`: an amendment can never shrink
+    ///      `budgetTotal` below what this mandate has already sub-delegated to its own children.
     // solhint-disable-next-line function-max-lines
     function amendMandate(bytes32 node, MandateTerms calldata terms) external nonReentrant {
         Mandate storage mandate = _mandateOrRevert(node);
@@ -338,6 +358,12 @@ contract MandateRegistrar is Ownable2Step, ReentrancyGuardTransient {
                 terms
             );
             parent.committed = parent.committed - mandate.terms.budgetTotal + finalTerms.budgetTotal;
+        } else {
+            finalTerms.allowlistRoot = mandate.terms.allowlistRoot;
+        }
+
+        if (finalTerms.budgetTotal < mandate.committed) {
+            revert MandateRegistrar__BudgetBelowCommitted(finalTerms.budgetTotal, mandate.committed);
         }
 
         // Effects before interactions: commit the new terms to storage before any external call,

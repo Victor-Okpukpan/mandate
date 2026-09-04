@@ -107,3 +107,19 @@ Stated here, not discovered by a judge. Full detail at `/docs/security`.
 - `AgentTreasury.fundJob`'s call into the ERC-8183 reference Jobs contract was verified against its
   deployed selectors, not against an end-to-end call on live infrastructure — this build was kept
   independent of live credentials throughout.
+- **Amending a mandate's `expiry`/`perTxCap` down does not cascade to its existing descendants.**
+  `MandateRegistrar.amendMandate` re-validates the mandate being amended against its *own* parent's
+  current terms, but never walks back down to already-issued children — there's no on-chain
+  children index to walk (only a running `committed` sum), and adding one purely to support a
+  retroactive tree-wide re-check was judged out of scope. Concretely: if `research.acme.eth` has
+  perTxCap 100k and its child `scraper.research.acme.eth` attenuated to perTxCap 100k too, later
+  tightening `research.acme.eth` to 10k does **not** touch `scraper`'s own stored 100k — it keeps
+  spending at the old cap until someone re-amends or revokes it directly. `allowlistRoot` and a
+  mandate's own `committed`-vs-`budgetTotal` ceiling *are* perpetually enforced on-chain (fixed
+  after an invariant run caught both), but numeric narrowing is currently only a point-in-time
+  check at attenuation/amendment, not a standing tree-wide guarantee. The fix belongs in the
+  Enforcer, not the registrar: it already indexes every mandate's `parentNode` from `MandateIssued`
+  logs to sync Arc, so it already has the full parent→children graph in memory — extending it to
+  cascade-clamp a descendant's *effective* synced terms to `min(own terms, every live ancestor's
+  current terms)` on any ancestor amendment is the same off-chain-ancestry mechanism this design
+  already relies on for revocation, just applied to numbers instead of a boolean. Not yet built.
