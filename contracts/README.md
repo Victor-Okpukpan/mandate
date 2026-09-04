@@ -53,8 +53,39 @@ is always explicitly marked as such where used.
 
 ```bash
 cast wallet import mandate-deployer --interactive   # once, per machine
-forge script script/DeploySepolia.s.sol --account mandate-deployer --sender <address> --broadcast
 ```
+
+Three scripts, run in this order:
+
+1. **`DeploySepolia.s.sol`** — deploys `MandateRegistrar` against the real ENSv2 Sepolia beta, then
+   registers the org's `ORG_ENS_LABEL` as a fresh 2LD via `ETHRegistrar`'s MockUSDC commit-reveal
+   flow (a real wall-clock `vm.sleep` past `MIN_COMMITMENT_AGE`, not `vm.warp` — this broadcasts
+   real transactions), wiring the registrar's own `ORG_ROOT_REGISTRY` as that name's subregistry in
+   the same `register()` call.
+   ```bash
+   forge script script/DeploySepolia.s.sol --account mandate-deployer --sender <address> \
+     --rpc-url $SEPOLIA_RPC_URL --broadcast
+   ```
+   Copy the logged `MandateRegistrar` address into `SEPOLIA_MANDATE_REGISTRAR` and
+   `NEXT_PUBLIC_MANDATE_REGISTRAR`.
+2. **`DeployArc.s.sol`** — deploys `MandateAnchor` and `AgentTreasury` on Arc testnet 5042002,
+   wired against the sponsor's own USDC and ERC-8183 Jobs contracts. Independent of step 1; doesn't
+   touch Sepolia.
+   ```bash
+   forge script script/DeployArc.s.sol --account mandate-deployer --sender <address> \
+     --rpc-url $ARC_RPC_URL --broadcast
+   ```
+   Copy the logged addresses into `ARC_MANDATE_ANCHOR`/`ARC_AGENT_TREASURY` and their
+   `NEXT_PUBLIC_` counterparts.
+3. **`SeedDemo.s.sol`** — issues the two demo mandates ("research", "ops") against the now-deployed
+   `SEPOLIA_MANDATE_REGISTRAR`. Deliberately does not sign or submit anything to Arc: mirroring a
+   mandate onto `MandateAnchor` is the Enforcer's job (run `enforcer/` next), not a one-shot
+   script's — a seed script holding the Enforcer's key, even temporarily, is exactly the kind of
+   plaintext-key exception these conventions exist to prevent.
+   ```bash
+   forge script script/SeedDemo.s.sol --account mandate-deployer --sender <address> \
+     --rpc-url $SEPOLIA_RPC_URL --broadcast
+   ```
 
 Admin-facing contracts (`MandateAnchor.setEnforcer`, `AgentTreasury`'s owner) use `Ownable2Step`.
 On mainnet that admin must be a multisig from the first deployment — a deployer EOA is a testnet-only
