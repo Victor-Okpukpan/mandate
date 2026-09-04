@@ -71,11 +71,18 @@ in `web/app/`.
 
 ## Deployed addresses
 
-| Contract | Chain | Address |
-| --- | --- | --- |
-| `MandateRegistrar` | Sepolia (11155111) | [`0x1C941C121463e1Ce9ab6541FdBa484b79d1D128A`](https://sepolia.etherscan.io/address/0x1C941C121463e1Ce9ab6541FdBa484b79d1D128A) |
-| `MandateAnchor` | Arc testnet (5042002) | [`0x5c2C1eb9Dc9f88Ebf10d96A8e8e74F1437d022Be`](https://testnet.arcscan.app/address/0x5c2C1eb9Dc9f88Ebf10d96A8e8e74F1437d022Be) |
-| `AgentTreasury` | Arc testnet (5042002) | [`0x1C941C121463e1Ce9ab6541FdBa484b79d1D128A`](https://testnet.arcscan.app/address/0x1C941C121463e1Ce9ab6541FdBa484b79d1D128A) |
+Source-verified — explorer links go straight to the readable contract.
+
+| Contract | Chain | Address | Verified via |
+| --- | --- | --- | --- |
+| `MandateRegistrar` | Sepolia (11155111) | [`0x1C941C121463e1Ce9ab6541FdBa484b79d1D128A`](https://sepolia.etherscan.io/address/0x1C941C121463e1Ce9ab6541FdBa484b79d1D128A) | [Sourcify](https://repo.sourcify.dev/contracts/full_match/11155111/0x1C941C121463e1Ce9ab6541FdBa484b79d1D128A/) |
+| `MandateAnchor` | Arc testnet (5042002) | [`0x5c2C1eb9Dc9f88Ebf10d96A8e8e74F1437d022Be`](https://testnet.arcscan.app/address/0x5c2C1eb9Dc9f88Ebf10d96A8e8e74F1437d022Be?tab=contract) | Blockscout |
+| `AgentTreasury` | Arc testnet (5042002) | [`0x1C941C121463e1Ce9ab6541FdBa484b79d1D128A`](https://testnet.arcscan.app/address/0x1C941C121463e1Ce9ab6541FdBa484b79d1D128A?tab=contract) | Blockscout |
+
+`MandateRegistrar` is verified via Sourcify rather than Etherscan directly (no Etherscan API key
+in this environment) — Etherscan mirrors Sourcify's full-match verifications for most chains
+including Sepolia, so its own page should pick this up; the Sourcify link is the authoritative
+source in the meantime.
 
 Org root: `mandate.eth`, registered on ENSv2 Sepolia via `DeploySepolia.s.sol`.
 
