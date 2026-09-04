@@ -68,8 +68,13 @@ in `web/app/`.
 
 ## Deployed addresses
 
-Not yet deployed. This section will list `MandateRegistrar`, `MandateAnchor`, and `AgentTreasury`
-on Sepolia/Arc testnet, plus verification links, once the deploy scripts have run.
+| Contract | Chain | Address |
+| --- | --- | --- |
+| `MandateRegistrar` | Sepolia (11155111) | [`0x1C941C121463e1Ce9ab6541FdBa484b79d1D128A`](https://sepolia.etherscan.io/address/0x1C941C121463e1Ce9ab6541FdBa484b79d1D128A) |
+| `MandateAnchor` | Arc testnet (5042002) | [`0x5c2C1eb9Dc9f88Ebf10d96A8e8e74F1437d022Be`](https://testnet.arcscan.app/address/0x5c2C1eb9Dc9f88Ebf10d96A8e8e74F1437d022Be) |
+| `AgentTreasury` | Arc testnet (5042002) | [`0x1C941C121463e1Ce9ab6541FdBa484b79d1D128A`](https://testnet.arcscan.app/address/0x1C941C121463e1Ce9ab6541FdBa484b79d1D128A) |
+
+Org root: `mandate.eth`, registered on ENSv2 Sepolia via `DeploySepolia.s.sol`.
 
 ## Design decisions that diverge from the original spec
 
