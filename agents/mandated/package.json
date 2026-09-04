@@ -1,0 +1,25 @@
+{
+  "name": "@mandate/agent-mandated",
+  "version": "0.0.0",
+  "private": true,
+  "description": "A single mandated agent runtime, parameterized by role (research/scraper/vendor) — same tool surface, different persona, per mandate.md §12.2.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "start": "tsx src/index.ts",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.123.0",
+    "@mandate/agents-shared": "workspace:*",
+    "@mandate/shared": "workspace:*",
+    "@privy-io/server-auth": "^1.32.5",
+    "viem": "^2.56.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.23.13",
+    "typescript": "^5.7.3"
+  }
+}

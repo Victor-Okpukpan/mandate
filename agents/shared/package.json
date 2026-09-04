@@ -1,0 +1,29 @@
+{
+  "name": "@mandate/agents-shared",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Shared tool surface and chain wiring for MANDATE's mandated agent runtimes.",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./tools": "./src/tools.ts",
+    "./signer": "./src/signer.ts",
+    "./chainClients": "./src/chainClients.ts",
+    "./runMandatedAgent": "./src/runMandatedAgent.ts"
+  },
+  "scripts": {
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.123.0",
+    "@mandate/shared": "workspace:*",
+    "@privy-io/server-auth": "^1.32.5",
+    "viem": "^2.56.3",
+    "zod": "^4.5.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.3"
+  }
+}
