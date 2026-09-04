@@ -25,6 +25,25 @@ Fork tests run against the real ENSv2 beta deployment — no mocks for anything 
 would agree with our assumptions instead of contradicting them, which is exactly the failure mode
 a beta-software integration needs to catch early.
 
+## Syncing ABIs to the frontend
+
+`packages/shared/src/abis/*.ts` is generated from `out/`, not hand-written. After changing a
+contract's public interface:
+
+```bash
+forge build
+python3 - <<'EOF'
+import json
+for name in ["MandateRegistrar", "MandateAnchor", "AgentTreasury"]:
+    with open(f"out/{name}.sol/{name}.json") as f:
+        abi = json.load(f)["abi"]
+    with open(f"../packages/shared/src/abis/{name}.ts", "w") as f:
+        f.write(f"// Auto-generated from contracts/out/{name}.sol/{name}.json — do not hand-edit.\n")
+        f.write("// Regenerate: cd contracts && forge build, then re-run the extraction (see contracts/README.md).\n")
+        f.write(f"export const {name}Abi = " + json.dumps(abi, indent=2) + " as const;\n")
+EOF
+```
+
 ## Deploying
 
 Every deploy script uses `forge script <path> --account $ACCOUNT --sender $SENDER` against

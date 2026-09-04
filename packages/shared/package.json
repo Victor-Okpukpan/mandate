@@ -14,7 +14,8 @@
     "./dnsEncode": "./src/dnsEncode.ts",
     "./ensKeys": "./src/ensKeys.ts",
     "./roles": "./src/roles.ts",
-    "./merkle": "./src/merkle.ts"
+    "./merkle": "./src/merkle.ts",
+    "./abis": "./src/abis/index.ts"
   },
   "scripts": {
     "test": "vitest run",

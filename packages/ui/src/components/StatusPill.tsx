@@ -1,4 +1,4 @@
-import { cn } from "../lib/cn.js";
+import { cn } from "../lib/cn";
 
 /**
  * The product's real vocabulary — four states, and nothing else in the system uses saturated

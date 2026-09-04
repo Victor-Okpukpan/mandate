@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { cn } from "../lib/cn.js";
+import { cn } from "../lib/cn";
 
 export interface CountdownProps {
   /** Unix seconds. Past values render as "expired" rather than a negative countdown. */
