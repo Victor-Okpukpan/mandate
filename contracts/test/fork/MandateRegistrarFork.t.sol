@@ -3,15 +3,14 @@ pragma solidity ^0.8.34;
 
 import { Test } from "forge-std/Test.sol";
 
+import { IETHRegistrar } from "contracts/interfaces/IETHRegistrar.sol";
+import { IMintableERC20 } from "contracts/interfaces/IMintableERC20.sol";
 import { IPermissionedResolver } from "contracts/interfaces/IPermissionedResolver.sol";
 import { IUserRegistry } from "contracts/interfaces/IUserRegistry.sol";
 import { IVerifiableFactory } from "contracts/interfaces/IVerifiableFactory.sol";
 import { LibDNSEncode } from "contracts/libraries/LibDNSEncode.sol";
 import { MandateKeys } from "contracts/libraries/MandateKeys.sol";
 import { MandateRegistrar } from "contracts/MandateRegistrar.sol";
-
-import { IETHRegistrar } from "contracts-test/fork/interfaces/IETHRegistrar.sol";
-import { IMintableERC20 } from "contracts-test/fork/interfaces/IMintableERC20.sol";
 
 /// @title MandateRegistrarForkTest
 /// @author Victor Okpukpan (@victorokpukpan_)
