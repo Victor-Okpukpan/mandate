@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Eyebrow } from "@mandate/ui/components/Type";
+import { Wordmark } from "@mandate/ui/components/Logo";
 
 const REPO_URL = process.env.NEXT_PUBLIC_REPO_URL ?? "https://github.com/victor-okpukpan/mandate";
 
@@ -18,7 +19,7 @@ export function Footer() {
       <div className="mx-auto max-w-6xl px-6 py-14">
         <div className="flex flex-col gap-10 sm:flex-row sm:justify-between">
           <div className="max-w-sm">
-            <div className="font-mono text-[13px] font-medium tracking-tight text-primary">MANDATE</div>
+            <Wordmark />
             <p className="mt-3 font-sans text-[17px] leading-snug text-secondary">
               ENS subnames are revocable powers of attorney for AI agents. Arc is where they spend.
             </p>

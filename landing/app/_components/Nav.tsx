@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ThemeToggle } from "@mandate/ui/components/Theme";
+import { Wordmark } from "@mandate/ui/components/Logo";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://app.runmandate.xyz";
 
@@ -12,9 +13,8 @@ export function Nav() {
   return (
     <header className="sticky top-0 z-50 border-b border-border-subtle bg-base/80 backdrop-blur-md">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
-        <Link href="/" className="flex items-center gap-2 font-mono text-[14px] font-medium tracking-tight text-primary">
-          <span className="h-1.5 w-1.5 rounded-full bg-live animate-pulse-live" aria-hidden />
-          MANDATE
+        <Link href="/">
+          <Wordmark />
         </Link>
         <nav className="hidden items-center gap-7 text-[14px] text-secondary sm:flex">
           <Link href="/docs" className="transition-colors hover:text-primary">

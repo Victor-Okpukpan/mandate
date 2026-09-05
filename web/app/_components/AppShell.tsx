@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { ThemeToggle } from "@mandate/ui/components/Theme";
+import { LogoMark, Wordmark } from "@mandate/ui/components/Logo";
 import { ConnectButton } from "./ConnectButton";
 
 const ROUTES = [
@@ -26,11 +27,12 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-dvh">
       <aside className="flex w-60 shrink-0 flex-col border-r border-border-subtle bg-surface max-lg:hidden">
-        <div className="flex h-16 items-center gap-2 border-b border-border-subtle px-5">
-          <span className="h-1.5 w-1.5 rounded-full bg-live animate-pulse-live" aria-hidden />
+        <div className="flex h-16 items-center gap-2.5 border-b border-border-subtle px-5">
+          <LogoMark className="h-5 w-5 shrink-0" />
           <span className="font-mono text-[13px] font-medium tracking-tight text-primary">
             {ORG_NAME}
           </span>
+          <span className="ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-live animate-pulse-live" aria-hidden />
         </div>
 
         <nav className="flex flex-1 flex-col gap-0.5 p-3">
@@ -71,9 +73,8 @@ export function AppShell({ children }: { children: ReactNode }) {
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex flex-col border-b border-border-subtle bg-base/80 backdrop-blur-md lg:hidden">
           <div className="flex h-16 items-center justify-between gap-4 px-6">
-            <Link href="/" className="flex items-center gap-2 font-mono text-[14px] font-medium tracking-tight text-primary">
-              <span className="h-1.5 w-1.5 rounded-full bg-live animate-pulse-live" aria-hidden />
-              MANDATE
+            <Link href="/">
+              <Wordmark />
             </Link>
             <div className="flex items-center gap-2">
               <ThemeToggle />
