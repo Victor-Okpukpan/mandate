@@ -18,9 +18,18 @@ export interface MandateNode {
   label?: string;
 }
 
-const ZERO_NODE = "0x0000000000000000000000000000000000000000000000000000000000000000000000000000" as Hex;
 const ROOT_PARENT = ("0x" + "0".repeat(64)) as Hex;
 const EXPIRING_WINDOW_SECONDS = 24 * 60 * 60; // within 24h of expiry reads as "expiring"
+
+/**
+ * The registrar can't have emitted anything before its own deployment, and public RPCs (e.g.
+ * publicnode.com: 50,000 blocks) cap how far back a single `eth_getLogs` call may span — so the
+ * backfill starts here instead of at `"earliest"`, which would eventually error outright as the
+ * gap between genesis and "latest" grows past that cap.
+ */
+const REGISTRAR_DEPLOY_BLOCK = process.env.NEXT_PUBLIC_MANDATE_REGISTRAR_DEPLOY_BLOCK
+  ? BigInt(process.env.NEXT_PUBLIC_MANDATE_REGISTRAR_DEPLOY_BLOCK)
+  : "earliest";
 
 /**
  * Event-sourced authority graph — no indexer, per the stack's own philosophy. Backfills every
@@ -47,20 +56,29 @@ export function useMandateGraph(registrarAddress: Address | undefined) {
 
     async function backfill() {
       setLoading(true);
-      const issuedLogs = await publicClient!.getContractEvents({
-        address: registrarAddress,
-        abi: MandateRegistrarAbi,
-        eventName: "MandateIssued",
-        fromBlock: "earliest",
-        toBlock: "latest",
-      });
-      const revokedLogs = await publicClient!.getContractEvents({
-        address: registrarAddress,
-        abi: MandateRegistrarAbi,
-        eventName: "MandateRevoked",
-        fromBlock: "earliest",
-        toBlock: "latest",
-      });
+      const [issuedLogs, amendedLogs, revokedLogs] = await Promise.all([
+        publicClient!.getContractEvents({
+          address: registrarAddress,
+          abi: MandateRegistrarAbi,
+          eventName: "MandateIssued",
+          fromBlock: REGISTRAR_DEPLOY_BLOCK,
+          toBlock: "latest",
+        }),
+        publicClient!.getContractEvents({
+          address: registrarAddress,
+          abi: MandateRegistrarAbi,
+          eventName: "MandateAmended",
+          fromBlock: REGISTRAR_DEPLOY_BLOCK,
+          toBlock: "latest",
+        }),
+        publicClient!.getContractEvents({
+          address: registrarAddress,
+          abi: MandateRegistrarAbi,
+          eventName: "MandateRevoked",
+          fromBlock: REGISTRAR_DEPLOY_BLOCK,
+          toBlock: "latest",
+        }),
+      ]);
 
       if (cancelled) return;
 
@@ -76,12 +94,19 @@ export function useMandateGraph(registrarAddress: Address | undefined) {
           };
           next.set(node, {
             node,
-            parentNode: parentNode === ROOT_PARENT || parentNode === ZERO_NODE ? null : parentNode,
+            parentNode: parentNode === ROOT_PARENT ? null : parentNode,
             agentWallet,
             resolver,
             expiry,
             revoked: false,
           });
+        }
+        // Applied after MandateIssued so an amendment's expiry always wins over the original —
+        // both event kinds can appear for the same node within this single backfill window.
+        for (const log of amendedLogs) {
+          const { node, expiry } = log.args as { node: Hex; expiry: bigint };
+          const existing = next.get(node);
+          if (existing) next.set(node, { ...existing, expiry });
         }
         for (const log of revokedLogs) {
           const { node } = log.args as { node: Hex };
@@ -118,7 +143,7 @@ export function useMandateGraph(registrarAddress: Address | undefined) {
           };
           next.set(node, {
             node,
-            parentNode: parentNode === ROOT_PARENT || parentNode === ZERO_NODE ? null : parentNode,
+            parentNode: parentNode === ROOT_PARENT ? null : parentNode,
             agentWallet,
             resolver,
             expiry,

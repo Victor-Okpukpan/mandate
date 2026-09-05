@@ -111,7 +111,7 @@ function GraphInner({ registrarAddress }: { registrarAddress: Hex }) {
 export default function GraphPage() {
   const addresses = getDeployedAddresses();
 
-  if (!isDeployed(addresses)) {
+  if (!isDeployed(addresses, ["mandateRegistrar"])) {
     return (
       <div className="flex h-[calc(100vh-3.5rem)] items-center justify-center px-6">
         <NotDeployed what="MandateRegistrar" />

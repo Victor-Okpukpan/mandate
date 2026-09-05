@@ -45,7 +45,7 @@ export default function NewMandatePage() {
     chainId: sepolia.id,
   });
 
-  if (!isDeployed(addresses)) {
+  if (!isDeployed(addresses, ["mandateRegistrar"])) {
     return (
       <div className="mx-auto max-w-xl px-6 py-16">
         <NotDeployed what="MandateRegistrar" />

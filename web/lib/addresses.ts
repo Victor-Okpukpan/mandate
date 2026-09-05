@@ -29,6 +29,15 @@ export function getDeployedAddresses(): DeployedAddresses {
   };
 }
 
-export function isDeployed(addresses: DeployedAddresses): boolean {
-  return Boolean(addresses.mandateRegistrar && addresses.mandateAnchor && addresses.agentTreasury);
+/**
+ * Checks only the addresses a given page actually needs — not all three. A page that only reads
+ * `MandateRegistrar` (the graph, the composer, the agent triptych) shouldn't show "not deployed"
+ * just because `AgentTreasury` hasn't gone out yet, and shouldn't blame the wrong contract when it
+ * does.
+ */
+export function isDeployed(
+  addresses: DeployedAddresses,
+  required: Array<keyof DeployedAddresses> = ["mandateRegistrar", "mandateAnchor", "agentTreasury"],
+): boolean {
+  return required.every((key) => Boolean(addresses[key]));
 }
