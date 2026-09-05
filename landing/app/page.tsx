@@ -74,7 +74,7 @@ export default function LandingPage() {
                 </Display>
               </motion.div>
               <motion.div variants={fadeUp}>
-                <Lede className="mx-auto mt-6 max-w-xl">
+                <Lede className="mx-auto mt-6 max-w-2xl">
                   A company issues each of its AI agents an ENS subname — think
                   research.acme.eth. That name&rsquo;s records are the agent&rsquo;s entire
                   spending authority: how much, to whom, until when. The agent can read its own
