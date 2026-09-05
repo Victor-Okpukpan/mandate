@@ -9,7 +9,7 @@ export interface ProofCardProps {
 
 export function ProofCard({ stat, label, detail }: ProofCardProps) {
   return (
-    <Card padding="lg" className="transition-shadow duration-300 hover:shadow-md">
+    <Card padding="lg" className="h-full transition-shadow duration-300 hover:shadow-md">
       <div className="font-sans text-4xl font-semibold tracking-tight text-primary">{stat}</div>
       <div className="mt-2 font-mono text-[12px] font-medium uppercase tracking-label text-accent">
         {label}
