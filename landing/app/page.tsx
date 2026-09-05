@@ -60,7 +60,7 @@ export default function LandingPage() {
             diagonal-screenshot hero before, which is a different shape entirely. */}
         <section className="relative overflow-hidden">
           <div className="bg-grid-texture bg-radial-wash absolute inset-0" aria-hidden />
-          <div className="relative mx-auto max-w-3xl px-6 pb-16 pt-20 text-center sm:pt-28">
+          <div className="relative mx-auto max-w-5xl px-6 pb-16 pt-20 text-center sm:pt-28">
             <motion.div variants={stagger()} initial="hidden" animate="visible">
               <motion.div variants={fadeUp}>
                 <Eyebrow className="text-center text-[12px]">
