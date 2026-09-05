@@ -104,14 +104,16 @@ export default function LandingPage() {
         </section>
 
         {/* ------------------------------------------------------------ BUILT ON */}
-        <section className="border-y border-border-subtle bg-surface-2/50 py-8">
-          <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-x-10 gap-y-3 px-6">
+        <section className="border-y border-border-subtle bg-surface-2/50 py-10">
+          <div className="mx-auto flex max-w-6xl flex-col items-center gap-4 px-6">
             <Eyebrow className="text-[11px]">Built on</Eyebrow>
-            {BUILT_ON.map((name) => (
-              <span key={name} className="font-mono text-[14px] font-medium text-tertiary">
-                {name}
-              </span>
-            ))}
+            <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-3">
+              {BUILT_ON.map((name) => (
+                <span key={name} className="font-mono text-[16px] font-medium text-secondary">
+                  {name}
+                </span>
+              ))}
+            </div>
           </div>
         </section>
 
@@ -260,12 +262,12 @@ export default function LandingPage() {
               whileInView="visible"
               viewport={VIEWPORT}
             >
-              <Card padding="lg" elevated className="relative overflow-hidden border-stale/30 bg-stale-subtle sm:p-12">
+              <Card padding="lg" elevated className="relative overflow-hidden sm:p-12">
                 <div
-                  className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-stale opacity-[0.14] blur-3xl"
+                  className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-stale opacity-[0.08] blur-3xl"
                   aria-hidden
                 />
-                <p className="relative font-mono text-[12px] font-medium uppercase tracking-label text-stale-strong">
+                <p className="relative font-mono text-[12px] font-medium uppercase tracking-label text-stale">
                   The Enforcer trust model
                 </p>
                 <h2 className="relative mt-4 max-w-2xl font-sans text-[28px] font-semibold leading-[1.15] tracking-tight text-primary sm:text-[34px]">
@@ -331,6 +333,37 @@ export default function LandingPage() {
               ))}
             </motion.div>
           </div>
+        </section>
+
+        {/* ------------------------------------------------------------- CTA */}
+        <section className="bg-mint-grid py-24 sm:py-28">
+          <motion.div
+            variants={stagger()}
+            initial="hidden"
+            whileInView="visible"
+            viewport={VIEWPORT}
+            className="mx-auto max-w-2xl px-6 text-center"
+          >
+            <motion.div variants={fadeUp}>
+              <Display as="h2" size="md">
+                Issue your first mandate.
+              </Display>
+            </motion.div>
+            <motion.div variants={fadeUp}>
+              <Lede className="mx-auto mt-4 max-w-lg">
+                Sign in, provision an agent wallet, and watch a real mandate go live on Sepolia —
+                no seed phrase, no testnet faucet hunting.
+              </Lede>
+            </motion.div>
+            <motion.div variants={fadeUp} className="mt-8 flex items-center justify-center">
+              <a
+                href={APP_URL}
+                className="inline-flex h-12 items-center rounded-lg bg-accent px-6 text-[15px] font-medium text-on-accent shadow-sm transition-colors hover:bg-accent-strong"
+              >
+                Launch app →
+              </a>
+            </motion.div>
+          </motion.div>
         </section>
       </main>
       <Footer />

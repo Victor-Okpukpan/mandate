@@ -4,13 +4,17 @@ import { Wordmark } from "@mandate/ui/components/Logo";
 
 const REPO_URL = process.env.NEXT_PUBLIC_REPO_URL ?? "https://github.com/victor-okpukpan/mandate";
 
+/**
+ * "Demo" is a presenter's run-of-show for a live walkthrough ("0:00 sign in on camera…") — useful
+ * to the person giving that walkthrough, not to a visitor reading the footer. Left reachable at
+ * /docs/demo for anyone who has the link; just not linked from here.
+ */
 const DOCS_LINKS = [
   { href: "/docs/architecture", label: "Architecture" },
   { href: "/docs/ens", label: "ENS" },
   { href: "/docs/privy", label: "Privy" },
   { href: "/docs/arc", label: "Arc" },
   { href: "/docs/security", label: "Security" },
-  { href: "/docs/demo", label: "Demo" },
 ];
 
 export function Footer() {
@@ -43,7 +47,7 @@ export function Footer() {
           </div>
         </div>
         <div className="mt-12 border-t border-border-subtle pt-6 font-mono text-[11px] text-disabled">
-          Built for ETHOnline 2026 · Every address is loaded from configuration, never hard-coded.
+          © {new Date().getFullYear()} MANDATE. All rights reserved.
         </div>
       </div>
     </footer>

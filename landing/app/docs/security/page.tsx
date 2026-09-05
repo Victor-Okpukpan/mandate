@@ -7,9 +7,9 @@ export default function SecurityDocsPage() {
     <Prose>
       <h1>Security &amp; known limitations</h1>
       <p>
-        Limitations disclosed here read as engineering maturity. The same limitations, found by a
-        judge instead, would read as bugs. Everything below is a deliberate, considered tradeoff —
-        not an oversight.
+        Every limitation below is a deliberate, disclosed tradeoff — not an oversight found later.
+        If something here looks like a gap, it&rsquo;s one we already knew about and chose to
+        accept, and the reasoning is on this page.
       </p>
 
       <h2>Threat model</h2>

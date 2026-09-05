@@ -13,14 +13,17 @@ export function Nav() {
   return (
     <header className="sticky top-0 z-50 border-b border-border-subtle bg-base/80 backdrop-blur-md">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
-        <Link href="/">
-          <Wordmark />
-        </Link>
-        <nav className="hidden items-center gap-7 text-[14px] text-secondary sm:flex">
-          <Link href="/docs" className="transition-colors hover:text-primary">
+        <div className="flex items-center gap-6">
+          <Link href="/">
+            <Wordmark />
+          </Link>
+          <Link
+            href="/docs"
+            className="hidden text-[14px] text-secondary transition-colors hover:text-primary sm:block"
+          >
             Docs
           </Link>
-        </nav>
+        </div>
         <div className="flex items-center gap-3">
           <ThemeToggle />
           <a
