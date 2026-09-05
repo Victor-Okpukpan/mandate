@@ -15,7 +15,19 @@
  * rather than invented per-surface. Everything else is near-neutral.
  */
 
-:root {
+/**
+ * :root and [data-theme="dark"] share ONE rule: dark is both the document default AND something
+ * applicable to a nested subtree (e.g. landing's light page floating a dark "app frame"
+ * screenshot). Combining them isn't just deduplication — it's required for correctness. CSS custom
+ * properties don't re-resolve their var() references per descendant: a property is computed once,
+ * where it's declared, then that computed value simply inherits. If the semantic tokens
+ * (--bg-surface, --live, --accent, etc.) were declared only on :root, a nested [data-theme="dark"]
+ * element would correctly get dark *raw* --mandate-* values but still inherit the *already-computed*
+ * light --bg-surface from its [data-theme="light"] ancestor — exactly the bug this structure avoids
+ * by making every theme selector declare its own full semantic layer, not just the raw palette.
+ */
+:root,
+[data-theme="dark"] {
   color-scheme: dark;
 
   /* -- raw palette (dark) -- */
@@ -50,6 +62,8 @@
   --mandate-stale-0: #e3e2f0;
   --mandate-stale-1: #8b8fc7;
   --mandate-stale-2: #62658f;
+
+  --shadow-color: 220 40% 2%;
 
   /* -- semantic tokens -- */
   --bg-base: var(--mandate-bg-0);
@@ -86,7 +100,6 @@
   --stale: var(--mandate-stale-1);
   --stale-strong: var(--mandate-stale-2);
 
-  --shadow-color: 220 40% 2%;
   --focus-ring: var(--mandate-accent-1);
 
   /* Elevation raw values — named --mandate-shadow-* (not --shadow-*) specifically so the
@@ -111,7 +124,10 @@
  * Dark is the committed default — not merely "dark when the OS agrees." A judge loading this on a
  * light-mode laptop should still see the product's actual identity, the same way Datadog or
  * Grafana don't reshuffle their palette to match the visitor's OS. Light is reserved for an
- * explicit [data-theme="light"] toggle (not yet built) — no prefers-color-scheme fallback here.
+ * explicit [data-theme="light"] toggle — no prefers-color-scheme fallback here. Declares its own
+ * full semantic layer for the same reason the dark rule above does: a nested [data-theme="light"]
+ * element (inside an otherwise-dark page) needs --bg-surface etc. to actually recompute locally,
+ * not inherit an ancestor's already-resolved dark value.
  */
 [data-theme="light"] {
   color-scheme: light;
@@ -146,8 +162,43 @@
   --mandate-stale-1: #5c5f96;
   --mandate-stale-2: #46496f;
 
-  --text-on-accent: #ffffff;
   --shadow-color: 220 20% 60%;
+
+  --bg-base: var(--mandate-bg-0);
+  --bg-surface: var(--mandate-bg-1);
+  --bg-surface-2: var(--mandate-bg-2);
+  --bg-surface-3: var(--mandate-bg-3);
+  --bg-overlay: color-mix(in oklab, var(--mandate-bg-0) 72%, transparent);
+
+  --border-subtle: var(--mandate-border-0);
+  --border-default: var(--mandate-border-1);
+  --border-strong: var(--mandate-border-2);
+
+  --text-primary: var(--mandate-text-0);
+  --text-secondary: var(--mandate-text-1);
+  --text-tertiary: var(--mandate-text-2);
+  --text-disabled: var(--mandate-text-3);
+  --text-on-accent: #ffffff;
+
+  --accent-subtle: var(--mandate-accent-0);
+  --accent: var(--mandate-accent-1);
+  --accent-strong: var(--mandate-accent-2);
+  --accent-pressed: var(--mandate-accent-3);
+
+  --live-subtle: var(--mandate-live-0);
+  --live: var(--mandate-live-1);
+  --live-strong: var(--mandate-live-2);
+  --expiring-subtle: var(--mandate-expiring-0);
+  --expiring: var(--mandate-expiring-1);
+  --expiring-strong: var(--mandate-expiring-2);
+  --revoked-subtle: var(--mandate-revoked-0);
+  --revoked: var(--mandate-revoked-1);
+  --revoked-strong: var(--mandate-revoked-2);
+  --stale-subtle: var(--mandate-stale-0);
+  --stale: var(--mandate-stale-1);
+  --stale-strong: var(--mandate-stale-2);
+
+  --focus-ring: var(--mandate-accent-1);
 
   /* Soft neutral shadows only — a light ground has no near-black to disappear against, so no inset
      highlight is needed here the way dark mode's ramp above needs one. Named --mandate-shadow-*
