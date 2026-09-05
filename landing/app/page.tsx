@@ -4,7 +4,8 @@ import Link from "next/link";
 import { motion } from "motion/react";
 import { Nav } from "./_components/Nav";
 import { Footer } from "./_components/Footer";
-import { KillSequenceHero } from "./_components/KillSequenceHero";
+import { AnnouncementBar } from "./_components/AnnouncementBar";
+import { ProductShot } from "./_components/ProductShot";
 import { PlaneCard } from "./_components/PlaneCard";
 import { ProofCard } from "./_components/ProofCard";
 import { StepCard } from "./_components/StepCard";
@@ -51,78 +52,55 @@ export default function LandingPage() {
   return (
     <>
       <Nav />
+      <AnnouncementBar />
       <main>
-        {/* ---------------------------------------------------------------- HERO */}
+        {/* ---------------------------------------------------------------- HERO
+            Centered stack — eyebrow, headline, subtext, one CTA — then the product shot below,
+            floating on its own. Matches safe.global's structure: this page had a two-column,
+            diagonal-screenshot hero before, which is a different shape entirely. */}
         <section className="relative overflow-hidden">
           <div className="bg-grid-texture bg-radial-wash absolute inset-0" aria-hidden />
-          <div className="relative mx-auto max-w-6xl px-6 pb-24 pt-20 sm:pt-28">
-            <div className="grid gap-16 lg:grid-cols-[1.1fr_1fr] lg:items-center">
-              <motion.div
-                variants={stagger()}
-                initial="hidden"
-                animate="visible"
-              >
-                <motion.div variants={fadeUp}>
-                  <Eyebrow className="text-[12px]">
-                    Agent identity &amp; spend control · ENSv2 + Arc + Privy
-                  </Eyebrow>
-                </motion.div>
-                <motion.div variants={fadeUp}>
-                  <Display as="h1" size="lg" className="mt-5">
-                    ENS subnames are revocable powers of attorney for AI agents.
-                    <span className="text-tertiary"> Arc is where they spend.</span>
-                  </Display>
-                </motion.div>
-                <motion.div variants={fadeUp}>
-                  <Lede className="mt-6">
-                    An organization issues each agent a subname that is non-transferable,
-                    self-expiring, and instantly revocable. The subname&rsquo;s resolver records{" "}
-                    <em className="text-primary not-italic">are</em> the mandate — its budget, its
-                    allowlist, its expiry. Revoke the role, and the agent&rsquo;s next payment dies
-                    mid-flight.
-                  </Lede>
-                </motion.div>
-                <motion.div variants={fadeUp} className="mt-9 flex flex-wrap items-center gap-3">
-                  <a
-                    href={APP_URL}
-                    className="inline-flex h-12 items-center rounded-lg bg-accent px-6 text-[15px] font-medium text-on-accent shadow-sm transition-colors hover:bg-accent-strong"
-                  >
-                    Launch the observatory →
-                  </a>
-                  <Link
-                    href="/docs/architecture"
-                    className="inline-flex h-12 items-center rounded-lg border border-border px-6 text-[15px] font-medium text-secondary transition-colors hover:border-border-strong hover:text-primary"
-                  >
-                    Read the architecture
-                  </Link>
-                </motion.div>
+          <div className="relative mx-auto max-w-3xl px-6 pb-16 pt-20 text-center sm:pt-28">
+            <motion.div variants={stagger()} initial="hidden" animate="visible">
+              <motion.div variants={fadeUp}>
+                <Eyebrow className="text-center text-[12px]">
+                  Agent identity &amp; spend control · ENSv2 + Arc + Privy
+                </Eyebrow>
               </motion.div>
-
-              {/* The dark observatory, floating as a product shot — the light/dark split IS the
-                  pitch: Safe floats screenshots on a light hero, and MANDATE's real dark app is
-                  exactly that asset. */}
-              <motion.div
-                initial={{ opacity: 0, y: 24, rotate: 3 }}
-                animate={{ opacity: 1, y: 0, rotate: 1 }}
-                whileHover={{ rotate: 0 }}
-                transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1], delay: 0.15 }}
-                data-theme="dark"
-                className="relative mx-auto w-full max-w-md rounded-2xl border border-border bg-surface p-2 shadow-xl"
-              >
-                <div className="flex items-center gap-1.5 px-3 py-2.5">
-                  <span className="h-2.5 w-2.5 rounded-full bg-revoked/60" aria-hidden />
-                  <span className="h-2.5 w-2.5 rounded-full bg-expiring/60" aria-hidden />
-                  <span className="h-2.5 w-2.5 rounded-full bg-live/60" aria-hidden />
-                  <span className="ml-2 font-mono text-[11px] text-tertiary">
-                    app.runmandate.xyz
-                  </span>
-                </div>
-                <div className="rounded-xl bg-base p-6">
-                  <KillSequenceHero />
-                </div>
+              <motion.div variants={fadeUp}>
+                <Display as="h1" size="lg" className="mt-5">
+                  ENS subnames are revocable powers of attorney for AI agents.
+                  <span className="text-tertiary"> Arc is where they spend.</span>
+                </Display>
               </motion.div>
-            </div>
+              <motion.div variants={fadeUp}>
+                <Lede className="mx-auto mt-6 max-w-xl">
+                  A company issues each of its AI agents an ENS subname — think
+                  research.acme.eth. That name&rsquo;s records are the agent&rsquo;s entire
+                  spending authority: how much, to whom, until when. The agent can read its own
+                  limits but cannot edit them. Revoke the name, and its very next payment is
+                  refused — before it signs, and again on-chain if it somehow tried.
+                </Lede>
+              </motion.div>
+              <motion.div variants={fadeUp} className="mt-9 flex items-center justify-center">
+                <a
+                  href={APP_URL}
+                  className="inline-flex h-12 items-center rounded-lg bg-accent px-6 text-[15px] font-medium text-on-accent shadow-sm transition-colors hover:bg-accent-strong"
+                >
+                  Launch app →
+                </a>
+              </motion.div>
+            </motion.div>
           </div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1], delay: 0.2 }}
+            className="relative px-6 pb-28 pt-6 sm:pb-36"
+          >
+            <ProductShot />
+          </motion.div>
         </section>
 
         {/* ------------------------------------------------------------ BUILT ON */}
@@ -231,8 +209,8 @@ export default function LandingPage() {
         {/* --------------------------------------------------------------- PROOF */}
         <section className="py-24 sm:py-28">
           <div className="mx-auto max-w-6xl px-6">
-            <SectionHeading lede="The question every judge who knows Privy will ask. Three answers, all citable against Privy's own documentation.">
-              &ldquo;Privy already does scoped permissions — why a chain?&rdquo;
+            <SectionHeading lede="A fair question if you already use Privy for wallet policies. Three concrete limits, straight from Privy's own documentation, and what adding a chain removes.">
+              &ldquo;Privy already handles permissions — why add a blockchain?&rdquo;
             </SectionHeading>
             <motion.div
               variants={stagger(0.1)}

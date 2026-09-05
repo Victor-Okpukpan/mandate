@@ -19,6 +19,48 @@ export default function DocsOverviewPage() {
         the agent&rsquo;s next payment dies mid-flight.
       </p>
 
+      <h2>Using the app</h2>
+      <p>
+        Concretely, in order, with nothing skipped:
+      </p>
+      <ol>
+        <li>
+          <strong>Sign in.</strong> &ldquo;Launch app&rdquo; opens the dashboard and asks for an
+          email — that&rsquo;s Privy&rsquo;s login, and it&rsquo;s how the org admin authenticates.
+          No wallet or seed phrase required to sign in.
+        </li>
+        <li>
+          <strong>Provision an agent.</strong> On the &ldquo;Issue mandate&rdquo; page, click
+          &ldquo;Provision a wallet&rdquo; before filling anything else in. This creates a real
+          Privy server wallet for the agent — its own address, holding its own keys, that you
+          never see or manage directly.
+        </li>
+        <li>
+          <strong>Set its limits and issue.</strong> Fill in a budget, a per-transaction cap, an
+          expiry, and at least one allowlisted recipient address, then sign the issue
+          transaction in your own wallet. This writes the mandate to Sepolia as an ENS subname —
+          the panel on the right shows the exact records that transaction will create, live, as
+          you type.
+        </li>
+        <li>
+          <strong>Watch it land.</strong> The new mandate appears in the tree on the dashboard
+          home page. Click it to open its detail view — the ENS records, its Arc-side state, and
+          (once an Enforcer has synced it) the actual Privy policy guarding its wallet.
+        </li>
+        <li>
+          <strong>Revoke it.</strong> The detail view has a &ldquo;Revoke this mandate&rdquo;
+          button. One transaction, and the agent&rsquo;s wallet can no longer sign a qualifying
+          payment, on either enforcement layer.
+        </li>
+      </ol>
+      <p>
+        One honest gap: syncing a freshly-issued mandate onto Arc and attaching its Privy policy
+        is done by a separate background service, the Enforcer — not something a visitor clicks a
+        button for in this UI. On a self-run deployment that service has to be running for steps 4
+        and 5 to show live Arc/Privy state; until then, a mandate exists and is fully real on
+        Sepolia, but its money-plane enforcement hasn&rsquo;t been mirrored yet.
+      </p>
+
       <h2>The problem</h2>
       <p>
         Giving an AI agent a wallet is easy. Giving it a wallet whose authority is{" "}

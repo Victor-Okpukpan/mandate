@@ -2,8 +2,12 @@ import Link from "next/link";
 import { ThemeToggle } from "@mandate/ui/components/Theme";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://app.runmandate.xyz";
-const REPO_URL = process.env.NEXT_PUBLIC_REPO_URL ?? "https://github.com/victor-okpukpan/mandate";
 
+/**
+ * Docs is the one nav link, on purpose — Architecture and GitHub used to sit next to it as
+ * separate items, but Architecture is itself a page inside /docs (a link to a link), and GitHub
+ * is one click further into /docs from there. Two redundant paths to the same content, cut.
+ */
 export function Nav() {
   return (
     <header className="sticky top-0 z-50 border-b border-border-subtle bg-base/80 backdrop-blur-md">
@@ -16,12 +20,6 @@ export function Nav() {
           <Link href="/docs" className="transition-colors hover:text-primary">
             Docs
           </Link>
-          <Link href="/docs/architecture" className="transition-colors hover:text-primary">
-            Architecture
-          </Link>
-          <a href={REPO_URL} className="transition-colors hover:text-primary" target="_blank" rel="noreferrer">
-            GitHub
-          </a>
         </nav>
         <div className="flex items-center gap-3">
           <ThemeToggle />
