@@ -10,16 +10,18 @@ export interface PlaneCardProps {
 
 export function PlaneCard({ index, title, chain, description, accentClass }: PlaneCardProps) {
   return (
-    <div className="relative rounded-xl border border-border bg-surface p-6">
-      <div className={`absolute left-0 top-6 h-8 w-0.5 rounded-full ${accentClass}`} aria-hidden />
-      <div className="pl-4">
-        <div className="flex items-baseline justify-between">
-          <span className="font-mono text-xs text-tertiary">{index}</span>
-          <span className="font-mono text-[11px] uppercase tracking-wide text-tertiary">{chain}</span>
-        </div>
-        <h3 className="mt-2 text-[15px] font-medium text-primary">{title}</h3>
-        <p className="mt-2 text-sm leading-relaxed text-secondary">{description}</p>
+    <div className="group relative rounded-2xl border border-border bg-surface p-7 shadow-sm transition-shadow hover:shadow-md">
+      <div className="flex items-center justify-between">
+        <span className="font-mono text-3xl font-semibold tabular-nums text-tertiary transition-colors group-hover:text-secondary">
+          {index}
+        </span>
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-border-subtle bg-surface-2 px-2.5 py-1 font-mono text-[11px] uppercase tracking-wide text-tertiary">
+          <span className={`h-1.5 w-1.5 rounded-full ${accentClass}`} aria-hidden />
+          {chain}
+        </span>
       </div>
+      <h3 className="mt-5 text-lg font-semibold tracking-tight text-primary">{title}</h3>
+      <p className="mt-2.5 text-[15px] leading-relaxed text-secondary">{description}</p>
     </div>
   );
 }
