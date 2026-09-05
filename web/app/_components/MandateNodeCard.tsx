@@ -24,7 +24,7 @@ const RING_CLASS: Record<MandateState, string> = {
 export function MandateNodeCard({ data }: NodeProps & { data: MandateNodeCardData }) {
   return (
     <div
-      className={`w-56 rounded-xl border bg-surface p-4 shadow-lg shadow-black/20 transition-colors ${RING_CLASS[data.state]}`}
+      className={`w-56 rounded-xl border bg-surface p-4 shadow-lg transition-colors ${RING_CLASS[data.state]}`}
     >
       <Handle type="target" position={Position.Top} className="!bg-border-strong" />
       <div className="flex items-start justify-between gap-2">
@@ -35,7 +35,11 @@ export function MandateNodeCard({ data }: NodeProps & { data: MandateNodeCardDat
       <div className="mt-3 flex items-center justify-between border-t border-border-subtle pt-3">
         <div>
           <p className="text-[10px] uppercase tracking-wide text-tertiary">Expires in</p>
-          <Countdown expiresAt={data.expiry} className="text-[13px] text-secondary" />
+          <Countdown
+            expiresAt={data.expiry}
+            urgency={data.state === "stale" ? undefined : data.state}
+            className="text-[13px]"
+          />
         </div>
         {data.state !== "revoked" && (
           <button

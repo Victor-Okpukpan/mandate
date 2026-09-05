@@ -31,10 +31,12 @@
   --mandate-text-2: #8b8f99;
   --mandate-text-3: #5c606a;
 
-  --mandate-accent-0: #dcecff;
-  --mandate-accent-1: #6fa8ff;
-  --mandate-accent-2: #3d7dff;
-  --mandate-accent-3: #2a5ecc;
+  /* Cyan-leaning teal, deliberately: a warmer teal (e.g. #0e7c86) sits too close to light-mode
+     live-green (#0f9d6e) — the accent must never be mistakable for a state colour. */
+  --mandate-accent-0: #d5f1fa;
+  --mandate-accent-1: #38bdf8;
+  --mandate-accent-2: #0ea5e9;
+  --mandate-accent-3: #0284c7;
 
   --mandate-live-0: #d3fbe8;
   --mandate-live-1: #34d399;
@@ -86,6 +88,23 @@
 
   --shadow-color: 220 40% 2%;
   --focus-ring: var(--mandate-accent-1);
+
+  /* Elevation raw values — named --mandate-shadow-* (not --shadow-*) specifically so the
+     @theme inline block below can declare --shadow-* as `var(--mandate-shadow-*)` without a
+     same-name circular self-reference, which silently invalidates the custom property. Dark
+     grounds need more than a shadow to read as raised — it disappears against near-black — so
+     every step pairs the shadow with a faint top inset highlight standing in for a light source.
+     Light mode (below) uses soft shadows alone; no highlight needed there. */
+  --mandate-shadow-xs: 0 1px 2px hsl(var(--shadow-color) / 0.4),
+    inset 0 1px 0 0 rgb(255 255 255 / 0.03);
+  --mandate-shadow-sm: 0 1px 3px hsl(var(--shadow-color) / 0.45),
+    0 1px 2px hsl(var(--shadow-color) / 0.3), inset 0 1px 0 0 rgb(255 255 255 / 0.04);
+  --mandate-shadow-md: 0 4px 8px hsl(var(--shadow-color) / 0.45),
+    0 2px 4px hsl(var(--shadow-color) / 0.3), inset 0 1px 0 0 rgb(255 255 255 / 0.05);
+  --mandate-shadow-lg: 0 12px 24px hsl(var(--shadow-color) / 0.5),
+    0 4px 8px hsl(var(--shadow-color) / 0.35), inset 0 1px 0 0 rgb(255 255 255 / 0.06);
+  --mandate-shadow-xl: 0 24px 48px hsl(var(--shadow-color) / 0.55),
+    0 8px 16px hsl(var(--shadow-color) / 0.4), inset 0 1px 0 0 rgb(255 255 255 / 0.07);
 }
 
 /**
@@ -109,10 +128,10 @@
   --mandate-text-2: #6b6f79;
   --mandate-text-3: #9a9ea8;
 
-  --mandate-accent-0: #eaf2ff;
-  --mandate-accent-1: #2a68e0;
-  --mandate-accent-2: #1e4fb8;
-  --mandate-accent-3: #163d8f;
+  --mandate-accent-0: #e0f2f7;
+  --mandate-accent-1: #0e7490;
+  --mandate-accent-2: #0b5c74;
+  --mandate-accent-3: #084a5e;
 
   --mandate-live-0: #e3faf0;
   --mandate-live-1: #0f9d6e;
@@ -129,6 +148,20 @@
 
   --text-on-accent: #ffffff;
   --shadow-color: 220 20% 60%;
+
+  /* Soft neutral shadows only — a light ground has no near-black to disappear against, so no inset
+     highlight is needed here the way dark mode's ramp above needs one. Named --mandate-shadow-*
+     for the same reason as the dark values: avoids a same-name circular reference with the
+     @theme inline block's --shadow-* declarations. */
+  --mandate-shadow-xs: 0 1px 2px hsl(var(--shadow-color) / 0.06);
+  --mandate-shadow-sm: 0 1px 3px hsl(var(--shadow-color) / 0.08),
+    0 1px 2px hsl(var(--shadow-color) / 0.05);
+  --mandate-shadow-md: 0 4px 8px hsl(var(--shadow-color) / 0.08),
+    0 2px 4px hsl(var(--shadow-color) / 0.05);
+  --mandate-shadow-lg: 0 12px 24px hsl(var(--shadow-color) / 0.1),
+    0 4px 8px hsl(var(--shadow-color) / 0.06);
+  --mandate-shadow-xl: 0 24px 48px hsl(var(--shadow-color) / 0.12),
+    0 8px 16px hsl(var(--shadow-color) / 0.07);
 }
 
 @theme inline {
@@ -168,6 +201,30 @@
   --color-stale-subtle: var(--stale-subtle);
   --color-stale: var(--stale);
   --color-stale-strong: var(--stale-strong);
+
+  --shadow-xs: var(--mandate-shadow-xs);
+  --shadow-sm: var(--mandate-shadow-sm);
+  --shadow-md: var(--mandate-shadow-md);
+  --shadow-lg: var(--mandate-shadow-lg);
+  --shadow-xl: var(--mandate-shadow-xl);
+
+  /* Fluid via clamp() so display sizes stay proportionate from phone to wide desktop without a
+     breakpoint ladder. Tracking tightens as size grows, per typographic convention. Literal values
+     (not a var() indirection) since neither varies between themes. */
+  --text-display-sm: clamp(1.5rem, 1.3rem + 0.9vw, 2.25rem);
+  --text-display-md: clamp(1.875rem, 1.5rem + 1.6vw, 3rem);
+  --text-display-lg: clamp(2.25rem, 1.7rem + 2.5vw, 4rem);
+  --text-display-xl: clamp(2.75rem, 2rem + 3.5vw, 5.5rem);
+
+  --tracking-display: -0.03em;
+  --tracking-tight: -0.015em;
+
+  /* Radius scale — every value in the app was ad hoc before this. */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-2xl: 1.5rem;
 
   --animate-pulse-live: pulse-live 2.4s ease-in-out infinite;
   --animate-fade-in: fade-in 0.4s ease-out both;
@@ -217,5 +274,30 @@
   :focus-visible {
     outline: 2px solid var(--focus-ring);
     outline-offset: 2px;
+  }
+}
+
+/**
+ * Texture utilities — token-driven so a flat ground (the light landing's biggest weakness before
+ * this) has somewhere to go besides a plain fill. Composable: apply both to the same element for a
+ * grid with a soft accent wash sitting on top of it.
+ */
+@layer utilities {
+  .bg-grid-texture {
+    background-image:
+      linear-gradient(to right, var(--border-subtle) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--border-subtle) 1px, transparent 1px);
+    background-size: 64px 64px;
+    background-position: center top;
+    -webkit-mask-image: linear-gradient(to bottom, black, transparent 85%);
+    mask-image: linear-gradient(to bottom, black, transparent 85%);
+  }
+
+  .bg-radial-wash {
+    background-image: radial-gradient(
+      ellipse 70% 60% at 50% -10%,
+      var(--accent-subtle),
+      transparent 70%
+    );
   }
 }
