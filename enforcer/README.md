@@ -32,17 +32,23 @@ cast wallet new-mnemonic   # or: cast wallet import mandate-enforcer --interacti
    has ever emitted, oldest first, and syncs each one — so a fresh Enforcer instance catches up to
    the registrar's full history before going live.
 2. **Watch.** Subscribes to the same three events going forward via `watchContractEvent`.
-3. **Per event:** reads the mandate's current terms and `mandateHash` from Sepolia, signs and
-   submits a `SyncPayload` to `MandateAnchor` (nonce seeded from the anchor's own on-chain value on
-   first use, never assumed to start at 0 after a restart), and — for a live mandate — compiles and
-   attaches a Privy conditional policy to the agent's wallet.
+3. **Per event:** reads the mandate's current terms, `mandateHash`, and `mandate.allow.human` from
+   Sepolia, signs and submits a `SyncPayload` to `MandateAnchor` (nonce seeded from the anchor's
+   own on-chain value on first use, never assumed to start at 0 after a restart), and resolves the
+   agent's Privy server wallet via `walletApi.getWallets()` (address → wallet id, live — no local
+   file to keep in sync) to sync or revoke its policy: a live mandate gets one `ALLOW` rule ANDing
+   the treasury address, the per-tx cap, and the recipient allowlist, then `DENY *`; a revoked one
+   gets rewritten straight to `DENY *` — the kill switch's off-chain half, independent of the
+   on-chain anchor flip.
 4. **Heartbeat.** Every `MAX_STALENESS_SECONDS / 3`, signs and submits a short-lived heartbeat for
    every currently-live agent, so `assertSpend`'s fail-closed staleness check never trips on a
    healthy Enforcer.
 
-## Known gap
+## Provisioning
 
-`walletRegistry.ts` maps an agent's on-chain address to its Privy wallet ID from a flat JSON file
-— populated when an agent's Privy wallet is first provisioned (the agent runtime's job, `agents/`,
-outside this service's scope). A deliberate, disclosed simplification for a single-Enforcer,
-single-org deployment; swap for a real datastore before running more than one instance.
+An agent needs a Privy server wallet before its mandate can be synced — the web app's
+`POST /api/agents/provision` route creates one (`walletApi.createWallet`) and returns its address,
+which becomes the mandate's `agentWallet`/`arcWallet` at issuance. This Enforcer only ever *finds*
+wallets via `getWallets()`; it never creates one. A mandate synced before its wallet exists just
+logs a warning and is retried on the next event for that node — nothing is lost, since the
+Enforcer's own backfill re-reads the registrar's full history on every restart.

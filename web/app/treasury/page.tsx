@@ -6,18 +6,12 @@ import { AgentTreasuryAbi } from "@mandate/shared/abis";
 import { fromErc20Usdc } from "@mandate/shared/decimals";
 import { Card } from "@mandate/ui/components/Card";
 import { MonoValue } from "@mandate/ui/components/MonoValue";
+import { Display, Eyebrow, Lede, RuleLabel } from "@mandate/ui/components/Type";
+import { Meter, Stat } from "@mandate/ui/components/Stat";
+import { Table, TableWrap, Td, Th, Tr } from "@mandate/ui/components/Table";
 import { getDeployedAddresses, isDeployed } from "../../lib/addresses";
 import { useMandateGraph } from "../../lib/useMandateGraph";
 import { NotDeployed } from "../_components/NotDeployed";
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <p className="text-[11px] uppercase tracking-wide text-tertiary">{label}</p>
-      <p className="mt-1 font-mono text-xl tabular-nums text-primary">{value}</p>
-    </div>
-  );
-}
 
 export default function TreasuryPage() {
   const addresses = getDeployedAddresses();
@@ -70,62 +64,71 @@ export default function TreasuryPage() {
     query: { enabled: agents.length > 0 },
   });
 
-  const utilisationPct =
-    totalDeposited && totalDeposited > 0n ? Number(((totalDrawn ?? 0n) * 10_000n) / totalDeposited) / 100 : 0;
+  const utilisationFraction =
+    totalDeposited && totalDeposited > 0n ? Number((totalDrawn ?? 0n) * 10_000n / totalDeposited) / 10_000 : 0;
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-10">
-      <h1 className="text-xl font-medium text-primary">Treasury</h1>
-      <p className="mt-2 text-sm text-secondary">
-        The org&rsquo;s revolving USDC credit facility on Arc — drawn vs. available, per-agent
-        utilisation, interest accruing.
-      </p>
+    <div className="mx-auto max-w-5xl px-6 py-10 sm:py-14">
+      <Eyebrow>Money plane · Arc testnet</Eyebrow>
+      <Display as="h1" size="sm" className="mt-2">
+        Treasury
+      </Display>
+      <Lede className="mt-3">
+        The org&rsquo;s revolving USDC credit facility on Arc — drawn against available, per-agent
+        utilisation, interest accruing simple, not compounding.
+      </Lede>
 
-      <Card className="mt-8 p-6">
-        <div className="grid grid-cols-2 gap-6 sm:grid-cols-4">
-          <Stat label="Deposited" value={`$${fromErc20Usdc(totalDeposited ?? 0n)}`} />
-          <Stat label="Drawn" value={`$${fromErc20Usdc(totalDrawn ?? 0n)}`} />
-          <Stat label="Utilisation" value={`${utilisationPct.toFixed(1)}%`} />
-          <Stat label="Cap / rate" value={`${((utilisationCapBps ?? 0) as number) / 100}% · ${((interestRateBps ?? 0) as number) / 100}% APY`} />
+      <Card padding="lg" className="mt-8">
+        <div className="grid grid-cols-2 gap-8 sm:grid-cols-5">
+          <Stat label="Deposited" value={fromErc20Usdc(totalDeposited ?? 0n)} unit="USDC" />
+          <Stat label="Drawn" value={fromErc20Usdc(totalDrawn ?? 0n)} unit="USDC" />
+          <Stat label="Utilisation" value={(utilisationFraction * 100).toFixed(1)} unit="%" />
+          <Stat label="Cap" value={((utilisationCapBps ?? 0) as number) / 100} unit="%" />
+          <Stat label="Interest" value={((interestRateBps ?? 0) as number) / 100} unit="% APY" />
         </div>
+        <Meter value={utilisationFraction} state={utilisationFraction > 0.9 ? "expiring" : "live"} className="mt-6" />
       </Card>
 
-      <h2 className="mt-10 text-[15px] font-medium text-primary">Per-agent</h2>
-      <div className="mt-4 overflow-hidden rounded-xl border border-border">
-        <table className="w-full border-collapse text-left text-[13px]">
-          <thead>
-            <tr className="border-b border-border bg-surface-2">
-              <th className="px-4 py-2.5 font-medium text-secondary">Agent</th>
-              <th className="px-4 py-2.5 font-medium text-secondary">Spent (this window)</th>
-              <th className="px-4 py-2.5 font-medium text-secondary">Principal owed</th>
-            </tr>
-          </thead>
-          <tbody>
-            {agents.map((agent, i) => {
-              const account = accounts?.[i]?.result as readonly [bigint, bigint, bigint, bigint] | undefined;
-              return (
-                <tr key={agent} className="border-b border-border-subtle last:border-0">
-                  <td className="px-4 py-2.5">
-                    <MonoValue value={agent} className="text-secondary" />
-                  </td>
-                  <td className="px-4 py-2.5 text-secondary">
-                    {account ? `$${fromErc20Usdc(account[0])}` : "—"}
-                  </td>
-                  <td className="px-4 py-2.5 text-secondary">
-                    {account ? `$${fromErc20Usdc(account[1])}` : "—"}
-                  </td>
+      <div className="mt-10">
+        <RuleLabel>Per-agent</RuleLabel>
+        <Card padding="lg" className="mt-4">
+          <TableWrap>
+            <Table>
+              <thead>
+                <tr>
+                  <Th>Agent</Th>
+                  <Th>Spent (this window)</Th>
+                  <Th>Principal owed</Th>
                 </tr>
-              );
-            })}
-            {agents.length === 0 && (
-              <tr>
-                <td colSpan={3} className="px-4 py-6 text-center text-tertiary">
-                  No agents with an issued mandate yet.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+              </thead>
+              <tbody>
+                {agents.map((agent, i) => {
+                  const account = accounts?.[i]?.result as readonly [bigint, bigint, bigint, bigint] | undefined;
+                  return (
+                    <Tr key={agent}>
+                      <Td>
+                        <MonoValue value={agent} className="text-secondary" />
+                      </Td>
+                      <Td className="tnum text-secondary">
+                        {account ? `$${fromErc20Usdc(account[0])}` : "—"}
+                      </Td>
+                      <Td className="tnum text-secondary">
+                        {account ? `$${fromErc20Usdc(account[1])}` : "—"}
+                      </Td>
+                    </Tr>
+                  );
+                })}
+                {agents.length === 0 && (
+                  <tr>
+                    <Td colSpan={3} className="text-center text-tertiary">
+                      No agents with an issued mandate yet.
+                    </Td>
+                  </tr>
+                )}
+              </tbody>
+            </Table>
+          </TableWrap>
+        </Card>
       </div>
     </div>
   );

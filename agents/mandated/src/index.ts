@@ -25,7 +25,16 @@ async function main() {
   const signer = devKey
     ? makeDevSigner(devKey as `0x${string}`, getRpcUrls())
     : makePrivySigner(
-        new PrivyClient(requireEnv("PRIVY_APP_ID"), requireEnv("PRIVY_APP_SECRET")),
+        // Matches the Enforcer's own PrivyClient construction (enforcer/src/index.ts) — if the
+        // org's Privy app has a registered authorization keypair, wallet RPC calls fail without
+        // this, per the SDK's own docstring. Omitting it here while the Enforcer passed it was
+        // the actual repo state before this fix; harmless for an app with no authorization key,
+        // silently broken for one that has it.
+        new PrivyClient(requireEnv("PRIVY_APP_ID"), requireEnv("PRIVY_APP_SECRET"), {
+          walletApi: process.env.PRIVY_AUTHORIZATION_PRIVATE_KEY
+            ? { authorizationPrivateKey: process.env.PRIVY_AUTHORIZATION_PRIVATE_KEY }
+            : undefined,
+        }),
         requireEnv("AGENT_PRIVY_WALLET_ID"),
         requireEnv("AGENT_ARC_WALLET_ADDRESS") as `0x${string}`,
       );

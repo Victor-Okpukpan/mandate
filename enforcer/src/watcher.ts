@@ -1,10 +1,11 @@
 import { sepolia } from "viem/chains";
 import { createPublicClient, http, type Address, type Hex } from "viem";
 import { PrivyClient } from "@privy-io/server-auth";
-import { MandateAnchorAbi, MandateRegistrarAbi } from "@mandate/shared/abis";
-import { attachPolicyToWallet, ensurePolicyForAgent } from "./privyPolicy.js";
+import { MandateAnchorAbi, MandateRegistrarAbi, PermissionedResolverAbi } from "@mandate/shared/abis";
+import { MANDATE_KEYS } from "@mandate/shared/ensKeys";
+import { parseAllowHuman } from "@mandate/shared/allowHuman";
+import { revokePolicyForWallet, syncPolicyForWallet } from "./privyPolicy.js";
 import { makeArcClients, submitSync, type SyncPayload } from "./arcSync.js";
-import { loadWalletRegistry } from "./walletRegistry.js";
 import type { PrivateKeyAccount } from "viem/accounts";
 
 export interface WatcherDeps {
@@ -15,7 +16,27 @@ export interface WatcherDeps {
   privy: PrivyClient;
   arcAccount: PrivateKeyAccount;
   arcRpcUrl: string;
-  walletRegistryPath: string;
+}
+
+/**
+ * Agent wallet address -> Privy wallet id. Previously a hand-maintained JSON file
+ * (`wallet-registry.json`) that nothing ever wrote — every sync found it empty and skipped policy
+ * sync entirely, so zero policies were ever created at runtime. `walletApi.getWallets()` already
+ * returns `address` + `id` for every server wallet in the app, which is the same information the
+ * file was meant to hold, live and without a second thing to keep in sync. Paginates because
+ * `getWallets` returns at most one page per call.
+ */
+async function loadWalletsByAddress(privy: PrivyClient): Promise<Map<Address, string>> {
+  const byAddress = new Map<Address, string>();
+  let cursor: string | undefined;
+  do {
+    const page = await privy.walletApi.getWallets({ chainType: "ethereum", cursor });
+    for (const wallet of page.data) {
+      byAddress.set(wallet.address.toLowerCase() as Address, wallet.id);
+    }
+    cursor = page.nextCursor;
+  } while (cursor);
+  return byAddress;
 }
 
 /** Per-agent nonce for `MandateAnchor.syncMandate` — strictly monotonic, per the contract's own
@@ -50,7 +71,6 @@ async function nextNonceFor(
 export async function startWatcher(deps: WatcherDeps) {
   const sepoliaClient = createPublicClient({ chain: sepolia, transport: http(deps.sepoliaRpcUrl) });
   const arcClients = makeArcClients(deps.arcRpcUrl, deps.arcAccount);
-  const walletRegistry = loadWalletRegistry(deps.walletRegistryPath);
   /** Agents with a live (non-revoked) mandate — the heartbeat loop reads this directly. */
   const liveAgents = new Set<Address>();
 
@@ -94,21 +114,41 @@ export async function startWatcher(deps: WatcherDeps) {
       liveAgents.add(agent);
     }
 
-    if (!revoked) {
-      const walletId = walletRegistry.get(agent);
-      if (!walletId) {
-        console.warn(`[privy] no wallet registry entry for ${agent} — skipping policy sync`);
+    const walletsByAddress = await loadWalletsByAddress(deps.privy);
+    const walletId = walletsByAddress.get(agent.toLowerCase() as Address);
+    if (!walletId) {
+      console.warn(`[privy] no Privy server wallet found for ${agent} — skipping policy sync`);
+      return;
+    }
+
+    if (revoked) {
+      // The kill switch's off-chain half: rewrite the policy to a bare DENY *, fail-closed on
+      // Privy independently of the on-chain anchor flip below. Not a detach — a wallet with no
+      // policy at all may default permissive, which is the opposite of what revocation means.
+      await revokePolicyForWallet(deps.privy, walletId);
+      console.log(`[privy] wallet ${walletId} (${agent}) revoked — policy rewritten to deny-all`);
+    } else {
+      const allowHumanJson = await sepoliaClient.readContract({
+        address: mandate.resolver,
+        abi: PermissionedResolverAbi,
+        functionName: "text",
+        args: [node, MANDATE_KEYS.allowHuman],
+      });
+      const allowedRecipients = parseAllowHuman(allowHumanJson);
+      if (allowedRecipients.length === 0) {
+        console.warn(
+          `[privy] ${node} has an empty mandate.allow.human — an 'in' condition over an empty ` +
+            `list matches nothing, so skipping policy sync rather than compiling a policy no ` +
+            `payment could ever pass.`,
+        );
         return;
       }
-      const { policyId } = await ensurePolicyForAgent(deps.privy, node, {
+      const { policyId } = await syncPolicyForWallet(deps.privy, walletId, node, {
         agentTreasury: deps.agentTreasuryAddress,
         perTxCapUsdcBaseUnits: mandate.terms.perTxCap,
-        allowedRecipients: [], // resolved from the allowlist root's known members at issuance time
+        allowedRecipients,
       });
-      await attachPolicyToWallet(deps.privy, walletId, policyId);
-      console.log(`[privy] policy ${policyId} attached to wallet ${walletId}`);
-    } else {
-      console.log(`[privy] ${agent} revoked — leaving its last policy in place (deny-by-default rule already blocks it)`);
+      console.log(`[privy] policy ${policyId} synced to wallet ${walletId} (${agent})`);
     }
   }
 

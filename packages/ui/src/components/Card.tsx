@@ -10,8 +10,9 @@ const PADDING_CLASSES = {
 
 export interface CardProps extends HTMLAttributes<HTMLDivElement> {
   children: ReactNode;
-  /** Real elevation (a shadow), not a background swap — use for anything meant to read as raised
-   *  off the page rather than flush against it. */
+  /** Real elevation (a shadow), not a background swap — for anything meant to read as raised off
+   *  the page rather than flush against it. On paper, use this sparingly: one raised thing per
+   *  view, or nothing reads as raised. */
   elevated?: boolean;
   padding?: keyof typeof PADDING_CLASSES;
 }
@@ -27,9 +28,9 @@ export function Card({
   return (
     <div
       className={cn(
-        "rounded-xl border border-border bg-surface",
+        "rounded-xl border border-border-subtle bg-surface",
         PADDING_CLASSES[padding],
-        elevated && "shadow-lg",
+        elevated ? "shadow-lg" : "shadow-xs",
         className,
       )}
       {...props}
@@ -39,12 +40,12 @@ export function Card({
   );
 }
 
-/** A card's title/eyebrow row — sits flush against the top edge with a divider below. */
+/** A card's title/eyebrow row — flush against the top edge with a hairline below. */
 export function CardHeader({ className, children, ...props }: HTMLAttributes<HTMLDivElement>) {
   return (
     <div
       className={cn(
-        "mb-4 flex items-start justify-between gap-4 border-b border-border-subtle pb-4",
+        "mb-5 flex items-start justify-between gap-4 border-b border-border-subtle pb-4",
         className,
       )}
       {...props}
@@ -54,14 +55,11 @@ export function CardHeader({ className, children, ...props }: HTMLAttributes<HTM
   );
 }
 
-/** A card's action row — sits flush against the bottom edge with a divider above. */
+/** A card's action row — flush against the bottom edge with a hairline above. */
 export function CardFooter({ className, children, ...props }: HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={cn(
-        "mt-4 flex items-center gap-3 border-t border-border-subtle pt-4",
-        className,
-      )}
+      className={cn("mt-5 flex items-center gap-3 border-t border-border-subtle pt-4", className)}
       {...props}
     >
       {children}

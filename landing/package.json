@@ -2,7 +2,7 @@
   "name": "@mandate/landing",
   "version": "0.0.0",
   "private": true,
-  "description": "MANDATE's landing page and per-sponsor docs — runmandate.xyz.",
+  "description": "MANDATE's landing page and per-sponsor docs \u2014 runmandate.xyz.",
   "license": "MIT",
   "scripts": {
     "dev": "next dev",
@@ -13,6 +13,7 @@
   "dependencies": {
     "@mandate/ui": "workspace:*",
     "geist": "^1.7.2",
+    "motion": "^12.6.3",
     "next": "^16.3.4",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"

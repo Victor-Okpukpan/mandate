@@ -1,19 +1,16 @@
 @import "tailwindcss";
 @import "@mandate/ui/tokens.css";
 
-@theme inline {
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", monospace;
-}
+/* Tailwind's automatic content detection walks the app's own directory tree — it does not cross
+   into a sibling pnpm workspace package. @mandate/ui ships raw .tsx source (not pre-built CSS),
+   so any utility class that appears ONLY inside a shared component (never duplicated verbatim in
+   this app) would otherwise be silently dropped from the build. This makes the scan explicit. */
+@source "../../packages/ui/src";
 
 html {
   scroll-behavior: smooth;
 }
 
 body {
-  font-feature-settings:
-    "cv02",
-    "cv03",
-    "cv04",
-    "cv11";
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
 }

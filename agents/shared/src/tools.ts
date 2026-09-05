@@ -10,6 +10,7 @@ import {
 import { getArcAddresses, getSepoliaAddresses } from "@mandate/shared/addresses";
 import { buildAllowlist } from "@mandate/shared/merkle";
 import { toErc20Usdc, fromErc20Usdc } from "@mandate/shared/decimals";
+import { parseAllowHuman } from "@mandate/shared/allowHuman";
 import { readArcAnchor, readMandateByEnsName, type makeChainClients } from "./chainClients.js";
 import type { AgentSigner } from "./signer.js";
 
@@ -46,18 +47,6 @@ function requireAddresses() {
   };
 }
 
-/** Parses `mandate.allow.human`'s display-only JSON (`[{"target":"0x..."}]`) back into a
- *  recipient list — the only place that field is actually consumed rather than merely shown,
- *  since it's what lets an agent reconstruct the merkle proof for its own allowlist root. */
-function parseAllowHuman(json: string): Address[] {
-  if (!json) return [];
-  try {
-    const parsed = JSON.parse(json) as Array<{ target: string }>;
-    return parsed.map((entry) => entry.target as Address);
-  } catch {
-    return [];
-  }
-}
 
 export function buildMandatedAgentTools(ctx: ToolContext) {
   const readMyMandate = betaZodTool({

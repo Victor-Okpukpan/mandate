@@ -11,8 +11,8 @@ export function Prose({ children }: { children: ReactNode }) {
       className={[
         "max-w-2xl",
         "[&>p]:mt-4 [&>p]:text-[15px] [&>p]:leading-relaxed [&>p]:text-secondary",
-        "[&>h1]:text-[1.75rem] [&>h1]:font-medium [&>h1]:tracking-tight [&>h1]:text-primary",
-        "[&>h2]:mt-12 [&>h2]:text-lg [&>h2]:font-medium [&>h2]:text-primary",
+        "[&>h1]:font-sans [&>h1]:text-[2rem] [&>h1]:font-semibold [&>h1]:tracking-tight [&>h1]:text-primary",
+        "[&>h2]:mt-12 [&>h2]:font-sans [&>h2]:text-[1.375rem] [&>h2]:font-semibold [&>h2]:tracking-tight [&>h2]:text-primary",
         "[&>h3]:mt-8 [&>h3]:text-[15px] [&>h3]:font-medium [&>h3]:text-primary",
         "[&_code]:rounded [&_code]:bg-surface-2 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-[13px] [&_code]:text-primary",
         "[&_a]:text-accent [&_a]:underline [&_a]:decoration-accent/30 [&_a]:underline-offset-4 hover:[&_a]:decoration-accent",

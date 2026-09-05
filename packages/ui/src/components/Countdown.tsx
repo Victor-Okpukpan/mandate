@@ -57,7 +57,7 @@ export function Countdown({ expiresAt, urgency, className }: CountdownProps) {
   const resolvedUrgency = urgency ?? deriveUrgency(secondsLeft);
 
   return (
-    <span className={cn("font-mono tabular-nums", URGENCY_CLASSES[resolvedUrgency], className)}>
+    <span className={cn("font-mono tnum", URGENCY_CLASSES[resolvedUrgency], className)}>
       {format(secondsLeft)}
     </span>
   );

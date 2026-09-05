@@ -9,74 +9,45 @@ import type { Address } from "viem";
  * not before. That ledger lives on `AgentTreasury.spentAccum` instead. Two different jobs, not a
  * belt-and-suspenders duplicate: see ARCHITECTURE.md.
  *
- * Every request type/field/operator combination used here matches
- * `@privy-io/server-auth`'s own `WalletApiPolicyRuleCreateRequestType` and its condition union
- * types — verified against the installed SDK's bundled `.d.ts`, not guessed from the REST docs
- * alone.
+ * REWRITE NOTES (was a real bypass before this pass — read before touching this file again):
+ *
+ * 1. The two ALLOW rules used to be SEPARATE ("restrict-to-treasury" and "per-tx-cap"). Rules OR
+ *    against each other; conditions WITHIN one rule AND. Two disjoint ALLOW rules meant a
+ *    transaction only had to satisfy ONE of them — so any amount at all to the treasury passed on
+ *    "restrict-to-treasury" alone, and the per-tx cap was never actually enforced. Fixed by
+ *    collapsing to exactly one ALLOW rule with all three conditions ANDed together.
+ * 2. `allowedRecipients` was accepted by this function and never referenced — the allowlist Privy
+ *    was documented as enforcing did not exist as a rule. Fixed: it's now a required `in` condition
+ *    on `payTo.to`, sourced by the caller from `mandate.allow.human` via `parseAllowHuman`
+ *    (`@mandate/shared/allowHuman`).
+ * 3. Calldata condition `field` values were bare argument names (`"amount"`, `"to"`). The live
+ *    Privy API rejects that — verified against a real app, not just the SDK's `.d.ts` — and
+ *    requires `"functionName.argumentName"` (`"payTo.amount"`, `"payTo.to"`). Bare names would
+ *    have failed `createPolicy` outright the first time this ever ran for real.
+ * 4. `ensurePolicyForAgent` created a brand-new policy on every single sync (issued AND amended),
+ *    named `mandate-<node[0..10]>` — not unique per amendment — and never checked for an existing
+ *    one. Every re-sync orphaned a duplicate policy that `getWallets()`'s `policyIds` no longer
+ *    referenced and that `getPolicy` (there's no `listPolicies`) could never find again. Fixed:
+ *    the caller resolves the wallet's current `policyIds[0]` and `updatePolicy`s it in place;
+ *    `createPolicy` only runs the first time a wallet has no policy at all.
+ * 5. Revocation left the previously-attached policy's ALLOW rule intact — the code comment claimed
+ *    "deny-by-default rule already blocks it," but the ALLOW rule sits ABOVE that deny rule and
+ *    still matches a qualifying transaction. Fixed: `revokePolicyForWallet` rewrites the policy
+ *    down to a single `DENY *` rule, so revocation fails closed on the Privy layer too, not only
+ *    on-chain.
  */
 
 export interface MandateTermsForPolicy {
   agentTreasury: Address;
   perTxCapUsdcBaseUnits: bigint;
+  /** Recipient addresses from `mandate.allow.human`, via `parseAllowHuman`. Empty means the
+   *  allowlist condition would match nothing — callers should treat that as "do not sync yet"
+   *  rather than compiling a policy no payment could ever pass. */
   allowedRecipients: Address[];
 }
 
-export async function ensurePolicyForAgent(
-  privy: PrivyClient,
-  mandateNode: string,
-  terms: MandateTermsForPolicy,
-): Promise<{ policyId: string }> {
-  const policyName = `mandate-${mandateNode.slice(0, 10)}`;
-
-  // Restrict eth_sendTransaction two ways: only TO the org's own AgentTreasury (an agent's wallet
-  // has no legitimate reason to send a raw transaction anywhere else), and only for `amount`
-  // values within the mandate's per-tx cap, read out of the calldata itself via the treasury's own
-  // ABI — the same "ethereum_calldata + abi + lte" pattern SPONSOR-NOTES confirms Privy supports.
-  const policy = await privy.walletApi.createPolicy({
-    name: policyName,
-    version: "1.0",
-    chainType: "ethereum",
-    rules: [
-      {
-        name: "restrict-to-treasury",
-        method: "eth_sendTransaction",
-        action: "ALLOW",
-        conditions: [
-          {
-            fieldSource: "ethereum_transaction",
-            field: "to",
-            operator: "eq",
-            value: terms.agentTreasury,
-          },
-        ],
-      },
-      {
-        name: "per-tx-cap",
-        method: "eth_sendTransaction",
-        action: "ALLOW",
-        conditions: [
-          {
-            fieldSource: "ethereum_calldata",
-            field: "amount",
-            operator: "lte",
-            value: terms.perTxCapUsdcBaseUnits.toString(),
-            abi: PAY_TO_ABI,
-          },
-        ],
-      },
-      {
-        name: "deny-everything-else",
-        method: "*",
-        action: "DENY",
-        conditions: [],
-      },
-    ],
-  });
-
-  return { policyId: policy.id };
-}
-
-/** Just enough of AgentTreasury's ABI for Privy's calldata-condition decoder to find `amount`. */
+/** Just enough of AgentTreasury's ABI for Privy's calldata-condition decoder to find `to` and
+ *  `amount` on the `payTo` call it's guarding. */
 const PAY_TO_ABI = [
   {
     type: "function",
@@ -91,11 +62,109 @@ const PAY_TO_ABI = [
   },
 ] as const;
 
-/** Attach `policyId` to `walletId` as an override on the agent's own signer, per mandate.md §4.5's
- *  key-quorum mapping — the routine path the Enforcer uses on every sync, not a one-time setup. */
-export async function attachPolicyToWallet(privy: PrivyClient, walletId: string, policyId: string) {
-  await privy.walletApi.updateWallet({
-    id: walletId,
-    policyIds: [policyId],
+const DENY_ALL_RULE = {
+  name: "deny-everything-else",
+  method: "*" as const,
+  action: "DENY" as const,
+  conditions: [],
+};
+
+/** The one rule a qualifying payment must satisfy, all three conditions ANDed. Extracted so
+ *  `ensurePolicyForAgent` (create path) and `syncPolicyForWallet` (update path) build byte-for-byte
+ *  the same rule from the same terms. */
+function buildMandateGateRule(terms: MandateTermsForPolicy) {
+  return {
+    name: "mandate-gate",
+    method: "eth_sendTransaction" as const,
+    action: "ALLOW" as const,
+    conditions: [
+      {
+        fieldSource: "ethereum_transaction" as const,
+        field: "to" as const,
+        operator: "eq" as const,
+        value: terms.agentTreasury,
+      },
+      {
+        fieldSource: "ethereum_calldata" as const,
+        field: "payTo.amount",
+        operator: "lte" as const,
+        value: terms.perTxCapUsdcBaseUnits.toString(),
+        abi: PAY_TO_ABI,
+      },
+      {
+        fieldSource: "ethereum_calldata" as const,
+        field: "payTo.to",
+        operator: "in" as const,
+        value: terms.allowedRecipients,
+        abi: PAY_TO_ABI,
+      },
+    ],
+  };
+}
+
+/**
+ * Creates a fresh policy for a wallet that doesn't have one yet. Named `mandate-<node[0..10]>` —
+ * not guaranteed globally unique across every possible node prefix collision, but stable and
+ * legible for a hackathon-scope single-org deployment. Callers should prefer
+ * `syncPolicyForWallet`, which only falls back to this when the wallet is genuinely unpolicied.
+ */
+export async function createPolicyForAgent(
+  privy: PrivyClient,
+  mandateNode: string,
+  terms: MandateTermsForPolicy,
+): Promise<{ policyId: string }> {
+  const policyName = `mandate-${mandateNode.slice(0, 10)}`;
+  const policy = await privy.walletApi.createPolicy({
+    name: policyName,
+    version: "1.0",
+    chainType: "ethereum",
+    rules: [buildMandateGateRule(terms), DENY_ALL_RULE],
   });
+  return { policyId: policy.id };
+}
+
+/**
+ * The routine path — call this on every sync, not just the first one. Resolves the wallet's
+ * current policy (there is no `listPolicies`, so `getWallets`'s own `policyIds` is the only way to
+ * find it) and `updatePolicy`s it in place with the freshly-compiled rule; only creates a new
+ * policy the first time this wallet has none. This is what stops every amendment from orphaning a
+ * duplicate.
+ */
+export async function syncPolicyForWallet(
+  privy: PrivyClient,
+  walletId: string,
+  mandateNode: string,
+  terms: MandateTermsForPolicy,
+): Promise<{ policyId: string }> {
+  const wallet = await privy.walletApi.getWallet({ id: walletId });
+  const existingPolicyId = wallet.policyIds?.[0];
+
+  if (!existingPolicyId) {
+    const { policyId } = await createPolicyForAgent(privy, mandateNode, terms);
+    await privy.walletApi.updateWallet({ id: walletId, policyIds: [policyId] });
+    return { policyId };
+  }
+
+  const updated = await privy.walletApi.updatePolicy({
+    id: existingPolicyId,
+    rules: [buildMandateGateRule(terms), DENY_ALL_RULE],
+  });
+  // Idempotent — the wallet already carries this policy id if it got here via the branch above,
+  // but a wallet whose policyIds were set by some other path might not, so keep it explicit.
+  await privy.walletApi.updateWallet({ id: walletId, policyIds: [updated.id] });
+  return { policyId: updated.id };
+}
+
+/**
+ * The kill switch's off-chain half. Revoking a mandate must make its wallet unable to sign a
+ * qualifying payment through Privy, not merely leave it to the on-chain `MandateAnchor` check —
+ * fails closed on BOTH layers, independently, per the product's own thesis. Rewrites the existing
+ * policy down to a bare `DENY *`; does nothing (silently) if the wallet was never given a policy,
+ * since there's nothing to close off.
+ */
+export async function revokePolicyForWallet(privy: PrivyClient, walletId: string): Promise<void> {
+  const wallet = await privy.walletApi.getWallet({ id: walletId });
+  const existingPolicyId = wallet.policyIds?.[0];
+  if (!existingPolicyId) return;
+  await privy.walletApi.updatePolicy({ id: existingPolicyId, rules: [DENY_ALL_RULE] });
 }

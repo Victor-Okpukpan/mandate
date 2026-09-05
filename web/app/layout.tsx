@@ -1,16 +1,25 @@
 import type { Metadata } from "next";
-import { GeistSans } from "geist/font/sans";
+import { DM_Sans } from "next/font/google";
 import { GeistMono } from "geist/font/mono";
 import "./globals.css";
+import { InitTheme, ThemeProvider } from "@mandate/ui/components/Theme";
 import { Providers } from "./providers";
-import { AppNav } from "./_components/AppNav";
+import { AppShell } from "./_components/AppShell";
+
+const dmSans = DM_Sans({
+  subsets: ["latin"],
+  weight: ["400", "500", "700"],
+  variable: "--font-dm-sans",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: {
-    default: "Observatory · MANDATE",
+    default: "Mandates · MANDATE",
     template: "%s · MANDATE",
   },
-  description: "The live authority graph — every agent mandate, its budget, and its status, in one view.",
+  description:
+    "Every agent mandate, its budget, and its status, read live from Sepolia, Privy, and Arc.",
   icons: {
     icon: "/favicon.svg",
   },
@@ -18,12 +27,18 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`} suppressHydrationWarning>
+    <html
+      lang="en"
+      className={`${dmSans.variable} ${GeistMono.variable}`}
+      suppressHydrationWarning
+    >
       <body className="bg-base text-primary font-sans antialiased">
-        <Providers>
-          <AppNav />
-          {children}
-        </Providers>
+        <InitTheme />
+        <ThemeProvider>
+          <Providers>
+            <AppShell>{children}</AppShell>
+          </Providers>
+        </ThemeProvider>
       </body>
     </html>
   );

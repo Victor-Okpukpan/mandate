@@ -33,7 +33,6 @@ async function main() {
     privy,
     arcAccount: account,
     arcRpcUrl: rpc.arc,
-    walletRegistryPath: process.env.ENFORCER_WALLET_REGISTRY_PATH ?? "./wallet-registry.json",
   });
 
   const stopHeartbeat = startHeartbeatLoop(

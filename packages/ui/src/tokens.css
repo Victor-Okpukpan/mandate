@@ -1,69 +1,73 @@
 /**
  * MANDATE design tokens — shared by landing/ and web/.
  *
- * Dark-first: the bare :root values ARE the dark palette (the product's primary, default
- * register — a live state graph read by expert judges, not a marketing site). Light overrides
- * live under [data-theme="light"] and prefers-color-scheme:light, in that order of precedence.
+ * Dark-first: the bare :root values ARE the dark palette. The ground is near-black with a faint
+ * green cast, and exactly one saturated colour — a bright mint — carries both "brand" and "active".
  *
  * Two tiers:
  *   1. Raw palette (--mandate-*) — never referenced directly outside this file.
  *   2. Semantic tokens, fed into Tailwind's @theme below so `bg-surface`, `text-primary`,
  *      `text-live`, etc. exist as utilities that resolve through these swappable variables.
  *
- * The four state colors (live / expiring / revoked / stale) are the ONLY saturated color in the
- * system — the graph's own vocabulary, reused everywhere (badges, ledger rows, docs diagrams)
- * rather than invented per-surface. Everything else is near-neutral.
+ * ACCENT AND `live` ARE DELIBERATELY THE SAME MINT. An earlier revision kept them distinct so the
+ * accent could never be mistaken for a state colour. In this register that separation is wrong:
+ * bright green *is* "active/permitted", and a second saturated hue competing with it just dilutes
+ * the page. So the palette is mint (accent + live), amber (expiring), red (revoked), slate
+ * (stale) — four meanings, four colours, nothing else saturated anywhere.
  */
 
 /**
  * :root and [data-theme="dark"] share ONE rule: dark is both the document default AND something
- * applicable to a nested subtree (e.g. landing's light page floating a dark "app frame"
- * screenshot). Combining them isn't just deduplication — it's required for correctness. CSS custom
- * properties don't re-resolve their var() references per descendant: a property is computed once,
- * where it's declared, then that computed value simply inherits. If the semantic tokens
- * (--bg-surface, --live, --accent, etc.) were declared only on :root, a nested [data-theme="dark"]
- * element would correctly get dark *raw* --mandate-* values but still inherit the *already-computed*
- * light --bg-surface from its [data-theme="light"] ancestor — exactly the bug this structure avoids
- * by making every theme selector declare its own full semantic layer, not just the raw palette.
+ * applicable to a nested subtree (a dark inset on a light page). Combining them isn't
+ * deduplication — it's required for correctness. CSS custom properties don't re-resolve their
+ * var() references per descendant: a property is computed once, where it's declared, then that
+ * computed value simply inherits. If the semantic tokens (--bg-surface, --live, --accent, etc.)
+ * were declared only on :root, a nested [data-theme="dark"] element inside a light region would
+ * correctly get dark *raw* --mandate-* values but still inherit the *already-computed* light
+ * --bg-surface from its ancestor — exactly the bug this structure avoids by making every theme
+ * selector declare its own full semantic layer, not just the raw palette. (Commit 54a8112.)
  */
 :root,
 [data-theme="dark"] {
   color-scheme: dark;
 
-  /* -- raw palette (dark) -- */
-  --mandate-bg-0: #08090b;
-  --mandate-bg-1: #0d0f12;
-  --mandate-bg-2: #131519;
-  --mandate-bg-3: #1a1d22;
-  --mandate-border-0: #1e2126;
-  --mandate-border-1: #2a2e35;
-  --mandate-border-2: #3a3f48;
-  --mandate-text-0: #f2f3f5;
-  --mandate-text-1: #c7cad1;
-  --mandate-text-2: #8b8f99;
-  --mandate-text-3: #5c606a;
+  /* -- raw palette (dark) --
+     Neutrals carry a trace of green (hue ~150) rather than blue, so the mint accent reads as
+     belonging to the ground instead of sitting on top of it. */
+  --mandate-bg-0: #080a09;
+  --mandate-bg-1: #0f1412;
+  --mandate-bg-2: #161c19;
+  --mandate-bg-3: #1e2622;
+  --mandate-border-0: #1b221f;
+  --mandate-border-1: #27302c;
+  --mandate-border-2: #38443e;
+  --mandate-text-0: #f2f6f4;
+  --mandate-text-1: #c2cbc7;
+  --mandate-text-2: #8a9691;
+  --mandate-text-3: #5a6560;
 
-  /* Cyan-leaning teal, deliberately: a warmer teal (e.g. #0e7c86) sits too close to light-mode
-     live-green (#0f9d6e) — the accent must never be mistakable for a state colour. */
-  --mandate-accent-0: #d5f1fa;
-  --mandate-accent-1: #38bdf8;
-  --mandate-accent-2: #0ea5e9;
-  --mandate-accent-3: #0284c7;
+  /* The one saturated hue. -0 is a deep tint for fills, not a pale one — on a near-black ground a
+     light "subtle" variant would out-shout the base colour it's meant to sit behind. */
+  --mandate-accent-0: #0a2a1a;
+  --mandate-accent-1: #12ff80;
+  --mandate-accent-2: #4dffa3;
+  --mandate-accent-3: #0fd96c;
 
-  --mandate-live-0: #d3fbe8;
-  --mandate-live-1: #34d399;
-  --mandate-live-2: #16a877;
-  --mandate-expiring-0: #fdecc8;
-  --mandate-expiring-1: #f2b33d;
-  --mandate-expiring-2: #c98a1f;
-  --mandate-revoked-0: #fbdbdb;
-  --mandate-revoked-1: #f2555f;
-  --mandate-revoked-2: #c93340;
-  --mandate-stale-0: #e3e2f0;
-  --mandate-stale-1: #8b8fc7;
-  --mandate-stale-2: #62658f;
+  /* `live` intentionally resolves to the same mint as the accent — see the file header. */
+  --mandate-live-0: #0a2a1a;
+  --mandate-live-1: #12ff80;
+  --mandate-live-2: #4dffa3;
+  --mandate-expiring-0: #2e2210;
+  --mandate-expiring-1: #ffb84d;
+  --mandate-expiring-2: #ffd08a;
+  --mandate-revoked-0: #2e1414;
+  --mandate-revoked-1: #ff5c5c;
+  --mandate-revoked-2: #ff9090;
+  --mandate-stale-0: #1a1f23;
+  --mandate-stale-1: #7c8794;
+  --mandate-stale-2: #a8b2bd;
 
-  --shadow-color: 220 40% 2%;
+  --shadow-color: 150 30% 2%;
 
   /* -- semantic tokens -- */
   --bg-base: var(--mandate-bg-0);
@@ -71,6 +75,7 @@
   --bg-surface-2: var(--mandate-bg-2);
   --bg-surface-3: var(--mandate-bg-3);
   --bg-overlay: color-mix(in oklab, var(--mandate-bg-0) 72%, transparent);
+  --bg-scrim: color-mix(in oklab, #000000 66%, transparent);
 
   --border-subtle: var(--mandate-border-0);
   --border-default: var(--mandate-border-1);
@@ -80,7 +85,7 @@
   --text-secondary: var(--mandate-text-1);
   --text-tertiary: var(--mandate-text-2);
   --text-disabled: var(--mandate-text-3);
-  --text-on-accent: #061021;
+  --text-on-accent: #04120a;
 
   --accent-subtle: var(--mandate-accent-0);
   --accent: var(--mandate-accent-1);
@@ -104,71 +109,71 @@
 
   /* Elevation raw values — named --mandate-shadow-* (not --shadow-*) specifically so the
      @theme inline block below can declare --shadow-* as `var(--mandate-shadow-*)` without a
-     same-name circular self-reference, which silently invalidates the custom property. Dark
-     grounds need more than a shadow to read as raised — it disappears against near-black — so
-     every step pairs the shadow with a faint top inset highlight standing in for a light source.
-     Light mode (below) uses soft shadows alone; no highlight needed there. */
-  --mandate-shadow-xs: 0 1px 2px hsl(var(--shadow-color) / 0.4),
+     same-name circular self-reference, which silently invalidates the custom property. On a
+     near-black ground a shadow alone is invisible, so every step pairs it with a faint top inset
+     highlight standing in for a light source. */
+  --mandate-shadow-xs: 0 1px 2px hsl(var(--shadow-color) / 0.5),
     inset 0 1px 0 0 rgb(255 255 255 / 0.03);
-  --mandate-shadow-sm: 0 1px 3px hsl(var(--shadow-color) / 0.45),
-    0 1px 2px hsl(var(--shadow-color) / 0.3), inset 0 1px 0 0 rgb(255 255 255 / 0.04);
-  --mandate-shadow-md: 0 4px 8px hsl(var(--shadow-color) / 0.45),
-    0 2px 4px hsl(var(--shadow-color) / 0.3), inset 0 1px 0 0 rgb(255 255 255 / 0.05);
-  --mandate-shadow-lg: 0 12px 24px hsl(var(--shadow-color) / 0.5),
-    0 4px 8px hsl(var(--shadow-color) / 0.35), inset 0 1px 0 0 rgb(255 255 255 / 0.06);
-  --mandate-shadow-xl: 0 24px 48px hsl(var(--shadow-color) / 0.55),
-    0 8px 16px hsl(var(--shadow-color) / 0.4), inset 0 1px 0 0 rgb(255 255 255 / 0.07);
+  --mandate-shadow-sm: 0 1px 3px hsl(var(--shadow-color) / 0.55),
+    0 1px 2px hsl(var(--shadow-color) / 0.35), inset 0 1px 0 0 rgb(255 255 255 / 0.04);
+  --mandate-shadow-md: 0 4px 10px hsl(var(--shadow-color) / 0.55),
+    0 2px 4px hsl(var(--shadow-color) / 0.35), inset 0 1px 0 0 rgb(255 255 255 / 0.05);
+  --mandate-shadow-lg: 0 14px 28px hsl(var(--shadow-color) / 0.6),
+    0 5px 10px hsl(var(--shadow-color) / 0.4), inset 0 1px 0 0 rgb(255 255 255 / 0.06);
+  --mandate-shadow-xl: 0 28px 56px hsl(var(--shadow-color) / 0.65),
+    0 10px 20px hsl(var(--shadow-color) / 0.45), inset 0 1px 0 0 rgb(255 255 255 / 0.07);
 }
 
 /**
- * Dark is the committed default — not merely "dark when the OS agrees." A judge loading this on a
- * light-mode laptop should still see the product's actual identity, the same way Datadog or
- * Grafana don't reshuffle their palette to match the visitor's OS. Light is reserved for an
- * explicit [data-theme="light"] toggle — no prefers-color-scheme fallback here. Declares its own
- * full semantic layer for the same reason the dark rule above does: a nested [data-theme="light"]
- * element (inside an otherwise-dark page) needs --bg-surface etc. to actually recompute locally,
- * not inherit an ancestor's already-resolved dark value.
+ * Light register — reached only by an explicit user toggle, and by light insets on a dark page.
+ * Declares its own full semantic layer for the same reason the dark rule above does; see the note
+ * there. No prefers-color-scheme fallback: dark is the committed default, and the toggle is the
+ * only thing that moves it.
+ *
+ * The mint does NOT survive the switch. #12ff80 on white is roughly 1.4:1 — unreadable — so light
+ * mode substitutes a deep green of the same hue family. Accent and `live` stay unified.
  */
 [data-theme="light"] {
   color-scheme: light;
 
-  --mandate-bg-0: #fbfbfc;
+  --mandate-bg-0: #fafbfa;
   --mandate-bg-1: #ffffff;
-  --mandate-bg-2: #f2f3f5;
-  --mandate-bg-3: #e8e9ec;
-  --mandate-border-0: #e7e8eb;
-  --mandate-border-1: #d7d9de;
-  --mandate-border-2: #c1c4cc;
-  --mandate-text-0: #14161a;
-  --mandate-text-1: #3a3d44;
-  --mandate-text-2: #6b6f79;
-  --mandate-text-3: #9a9ea8;
+  --mandate-bg-2: #f1f4f2;
+  --mandate-bg-3: #e5eae7;
+  --mandate-border-0: #e8edea;
+  --mandate-border-1: #d9e0dc;
+  --mandate-border-2: #bfc9c3;
+  --mandate-text-0: #0a0f0c;
+  --mandate-text-1: #39423d;
+  --mandate-text-2: #67716b;
+  --mandate-text-3: #98a29b;
 
-  --mandate-accent-0: #e0f2f7;
-  --mandate-accent-1: #0e7490;
-  --mandate-accent-2: #0b5c74;
-  --mandate-accent-3: #084a5e;
+  --mandate-accent-0: #ddfbea;
+  --mandate-accent-1: #00a85a;
+  --mandate-accent-2: #00854a;
+  --mandate-accent-3: #006b3c;
 
-  --mandate-live-0: #e3faf0;
-  --mandate-live-1: #0f9d6e;
-  --mandate-live-2: #0b7d58;
-  --mandate-expiring-0: #fdf3dd;
-  --mandate-expiring-1: #b3790f;
-  --mandate-expiring-2: #8f5f0a;
-  --mandate-revoked-0: #fdecec;
-  --mandate-revoked-1: #d5323d;
-  --mandate-revoked-2: #ab2530;
-  --mandate-stale-0: #edecf7;
-  --mandate-stale-1: #5c5f96;
-  --mandate-stale-2: #46496f;
+  --mandate-live-0: #ddfbea;
+  --mandate-live-1: #00a85a;
+  --mandate-live-2: #00854a;
+  --mandate-expiring-0: #fbf1dc;
+  --mandate-expiring-1: #b87a12;
+  --mandate-expiring-2: #93610d;
+  --mandate-revoked-0: #fbe9e9;
+  --mandate-revoked-1: #c4323e;
+  --mandate-revoked-2: #9e2731;
+  --mandate-stale-0: #eceff1;
+  --mandate-stale-1: #5f6b77;
+  --mandate-stale-2: #48525c;
 
-  --shadow-color: 220 20% 60%;
+  --shadow-color: 150 12% 55%;
 
   --bg-base: var(--mandate-bg-0);
   --bg-surface: var(--mandate-bg-1);
   --bg-surface-2: var(--mandate-bg-2);
   --bg-surface-3: var(--mandate-bg-3);
   --bg-overlay: color-mix(in oklab, var(--mandate-bg-0) 72%, transparent);
+  --bg-scrim: color-mix(in oklab, #101713 55%, transparent);
 
   --border-subtle: var(--mandate-border-0);
   --border-default: var(--mandate-border-1);
@@ -200,23 +205,25 @@
 
   --focus-ring: var(--mandate-accent-1);
 
-  /* Soft neutral shadows only — a light ground has no near-black to disappear against, so no inset
-     highlight is needed here the way dark mode's ramp above needs one. Named --mandate-shadow-*
-     for the same reason as the dark values: avoids a same-name circular reference with the
-     @theme inline block's --shadow-* declarations. */
-  --mandate-shadow-xs: 0 1px 2px hsl(var(--shadow-color) / 0.06);
-  --mandate-shadow-sm: 0 1px 3px hsl(var(--shadow-color) / 0.08),
+  --mandate-shadow-xs: 0 1px 2px hsl(var(--shadow-color) / 0.07);
+  --mandate-shadow-sm: 0 1px 3px hsl(var(--shadow-color) / 0.09),
     0 1px 2px hsl(var(--shadow-color) / 0.05);
-  --mandate-shadow-md: 0 4px 8px hsl(var(--shadow-color) / 0.08),
+  --mandate-shadow-md: 0 4px 10px hsl(var(--shadow-color) / 0.09),
     0 2px 4px hsl(var(--shadow-color) / 0.05);
-  --mandate-shadow-lg: 0 12px 24px hsl(var(--shadow-color) / 0.1),
-    0 4px 8px hsl(var(--shadow-color) / 0.06);
-  --mandate-shadow-xl: 0 24px 48px hsl(var(--shadow-color) / 0.12),
-    0 8px 16px hsl(var(--shadow-color) / 0.07);
+  --mandate-shadow-lg: 0 14px 28px hsl(var(--shadow-color) / 0.11),
+    0 5px 10px hsl(var(--shadow-color) / 0.06);
+  --mandate-shadow-xl: 0 28px 56px hsl(var(--shadow-color) / 0.14),
+    0 10px 20px hsl(var(--shadow-color) / 0.08);
 }
 
 @theme inline {
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  /* Two voices, and each has exactly one job. There is no serif anywhere in this system.
+       sans — every headline, every word a human reads, all UI chrome.
+       mono — every value that came off a chain: addresses, hashes, USDC amounts, ENS record keys,
+              policy rule names. If it is machine-authored, it is mono.
+     next/font is a build-time macro, so each app declares the actual faces; this file only fixes
+     the contract that the variable names point at (see fonts.ts). */
+  --font-sans: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", monospace;
 
   --color-base: var(--bg-base);
@@ -224,6 +231,7 @@
   --color-surface-2: var(--bg-surface-2);
   --color-surface-3: var(--bg-surface-3);
   --color-overlay: var(--bg-overlay);
+  --color-scrim: var(--bg-scrim);
 
   --color-border-subtle: var(--border-subtle);
   --color-border: var(--border-default);
@@ -260,26 +268,36 @@
   --shadow-xl: var(--mandate-shadow-xl);
 
   /* Fluid via clamp() so display sizes stay proportionate from phone to wide desktop without a
-     breakpoint ladder. Tracking tightens as size grows, per typographic convention. Literal values
-     (not a var() indirection) since neither varies between themes. */
+     breakpoint ladder. Sized for a grotesk: DM Sans has a taller x-height than a serif at the same
+     px, so these are a touch smaller than the scale they replaced. */
   --text-display-sm: clamp(1.5rem, 1.3rem + 0.9vw, 2.25rem);
-  --text-display-md: clamp(1.875rem, 1.5rem + 1.6vw, 3rem);
-  --text-display-lg: clamp(2.25rem, 1.7rem + 2.5vw, 4rem);
-  --text-display-xl: clamp(2.75rem, 2rem + 3.5vw, 5.5rem);
+  --text-display-md: clamp(1.875rem, 1.5rem + 1.7vw, 3rem);
+  --text-display-lg: clamp(2.25rem, 1.7rem + 2.6vw, 4rem);
+  --text-display-xl: clamp(2.75rem, 2rem + 3.6vw, 5rem);
 
-  --tracking-display: -0.03em;
-  --tracking-tight: -0.015em;
+  /* A grotesk at display size needs MORE negative tracking than a serif does — no serifs bridging
+     the gaps between letterforms. */
+  --tracking-display: -0.035em;
+  --tracking-tight: -0.018em;
+  /* Mono eyebrows and column headers: small, uppercase, opened up. */
+  --tracking-label: 0.07em;
 
-  /* Radius scale — every value in the app was ad hoc before this. */
   --radius-sm: 0.375rem;
   --radius-md: 0.5rem;
   --radius-lg: 0.75rem;
   --radius-xl: 1rem;
   --radius-2xl: 1.5rem;
 
+  /* One easing curve for the entire product. Every transition, CSS or JS, uses --ease-out or its
+     JS-array twin in packages/ui/src/lib/motion.ts. Consistency of curve is what separates
+     "animated" from "choreographed". */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+
   --animate-pulse-live: pulse-live 2.4s ease-in-out infinite;
-  --animate-fade-in: fade-in 0.4s ease-out both;
-  --animate-rise-in: rise-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-fade-in: fade-in 0.4s var(--ease-out) both;
+  --animate-rise-in: rise-in 0.5s var(--ease-out) both;
+  --animate-marquee: marquee 42s linear infinite;
 
   @keyframes pulse-live {
     0%,
@@ -287,7 +305,7 @@
       opacity: 1;
     }
     50% {
-      opacity: 0.55;
+      opacity: 0.45;
     }
   }
   @keyframes fade-in {
@@ -308,6 +326,14 @@
       transform: translateY(0);
     }
   }
+  @keyframes marquee {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-50%);
+    }
+  }
 }
 
 @layer base {
@@ -319,36 +345,69 @@
     color: var(--color-primary);
   }
   ::selection {
-    background-color: var(--accent-subtle);
+    background-color: var(--accent);
     color: var(--text-on-accent);
   }
   :focus-visible {
     outline: 2px solid var(--focus-ring);
     outline-offset: 2px;
   }
+
+  /* Honour the OS accessibility setting globally, so no individual component has to remember to.
+     Motion's own components read the same preference via useReducedMotion(). */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
 }
 
-/**
- * Texture utilities — token-driven so a flat ground (the light landing's biggest weakness before
- * this) has somewhere to go besides a plain fill. Composable: apply both to the same element for a
- * grid with a soft accent wash sitting on top of it.
- */
 @layer utilities {
+  /* A hairline grid, masked to fade out — the ground texture under hero and CTA blocks. */
   .bg-grid-texture {
     background-image:
       linear-gradient(to right, var(--border-subtle) 1px, transparent 1px),
       linear-gradient(to bottom, var(--border-subtle) 1px, transparent 1px);
-    background-size: 64px 64px;
+    background-size: 72px 72px;
     background-position: center top;
-    -webkit-mask-image: linear-gradient(to bottom, black, transparent 85%);
-    mask-image: linear-gradient(to bottom, black, transparent 85%);
+    -webkit-mask-image: linear-gradient(to bottom, black, transparent 88%);
+    mask-image: linear-gradient(to bottom, black, transparent 88%);
   }
 
-  .bg-radial-wash {
+  /* Mint bloom behind a hero headline. Kept low-opacity via color-mix rather than a hard tint, so
+     it reads as light coming off the accent rather than as a green rectangle. */
+  .bg-mint-wash {
     background-image: radial-gradient(
-      ellipse 70% 60% at 50% -10%,
-      var(--accent-subtle),
+      ellipse 65% 55% at 50% -10%,
+      color-mix(in oklab, var(--accent) 22%, transparent),
       transparent 70%
     );
+  }
+
+  /* The blocky mint gradient panels Safe uses at the page edges — grid plus a corner bloom. */
+  .bg-mint-grid {
+    background-color: color-mix(in oklab, var(--accent) 8%, var(--bg-base));
+    background-image:
+      linear-gradient(to right, color-mix(in oklab, var(--accent) 12%, transparent) 1px, transparent 1px),
+      linear-gradient(to bottom, color-mix(in oklab, var(--accent) 12%, transparent) 1px, transparent 1px);
+    background-size: 64px 64px;
+  }
+
+  /* Fades the edges of a horizontally-scrolling strip instead of cutting it dead, so a marquee or
+     an overflowing table reads as continuing rather than clipped. */
+  .mask-fade-x {
+    -webkit-mask-image: linear-gradient(to right, transparent, black 6%, black 94%, transparent);
+    mask-image: linear-gradient(to right, transparent, black 6%, black 94%, transparent);
+  }
+
+  /* Numerals that don't jitter as a countdown ticks or a balance updates. */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
   }
 }
