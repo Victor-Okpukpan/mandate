@@ -12,6 +12,9 @@ import { createWalletCache } from "./walletCache.js";
 export interface SupervisorDeps {
   privy: PrivyClient;
   arcAccount: PrivateKeyAccount;
+  /** See `WatcherDeps`'s own field of the same name — passed through unchanged, one Enforcer
+   *  process shares one authorization key across every org it watches. */
+  authorizationContext?: { authorization_private_keys: string[] };
 }
 
 /**
@@ -79,6 +82,7 @@ export async function startOrgSupervisor(deps: SupervisorDeps) {
       wallets,
       arcAccount: deps.arcAccount,
       arcRpcUrl: rpc.arc,
+      authorizationContext: deps.authorizationContext,
     };
 
     try {

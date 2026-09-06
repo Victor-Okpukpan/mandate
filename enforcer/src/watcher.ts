@@ -20,6 +20,10 @@ export interface WatcherDeps {
   wallets: WalletCache;
   arcAccount: PrivateKeyAccount;
   arcRpcUrl: string;
+  /** From `config.ts`'s `loadEnforcerAuthorizationContext()` — `undefined` on a deployment that
+   *  hasn't run `enforcer/scripts/setup-authorization-quorum.ts` yet, in which case every wallet
+   *  this Enforcer touches is assumed ownerless, exactly as before this existed. */
+  authorizationContext?: { authorization_private_keys: string[] };
 }
 
 export async function startWatcher(deps: WatcherDeps) {
@@ -116,7 +120,7 @@ export async function startWatcher(deps: WatcherDeps) {
       // The kill switch's off-chain half: rewrite the policy to a bare DENY *, fail-closed on
       // Privy independently of the on-chain anchor flip below. Not a detach — a wallet with no
       // policy at all may default permissive, which is the opposite of what revocation means.
-      await revokePolicyForWallet(deps.privy, walletId);
+      await revokePolicyForWallet(deps.privy, walletId, deps.authorizationContext);
       console.log(`[privy] wallet ${walletId} (${agent}) revoked — policy rewritten to deny-all`);
     } else {
       const allowHumanJson = await sepoliaClient.readContract({
@@ -134,11 +138,17 @@ export async function startWatcher(deps: WatcherDeps) {
         );
         return;
       }
-      const { policyId } = await syncPolicyForWallet(deps.privy, walletId, node, {
-        agentTreasury: deps.agentTreasuryAddress,
-        perTxCapUsdcBaseUnits: mandate.terms.perTxCap,
-        allowedRecipients,
-      });
+      const { policyId } = await syncPolicyForWallet(
+        deps.privy,
+        walletId,
+        node,
+        {
+          agentTreasury: deps.agentTreasuryAddress,
+          perTxCapUsdcBaseUnits: mandate.terms.perTxCap,
+          allowedRecipients,
+        },
+        deps.authorizationContext,
+      );
       console.log(`[privy] policy ${policyId} synced to wallet ${walletId} (${agent})`);
     }
   }

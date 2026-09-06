@@ -76,3 +76,27 @@ which becomes the mandate's `agentWallet`/`arcWallet` at issuance. This Enforcer
 wallets via `getWallets()`; it never creates one. A mandate synced before its wallet exists just
 logs a warning and is retried on the next event for that node — nothing is lost, since the
 Enforcer's own backfill re-reads the registrar's full history on every restart.
+
+## Wallet ownership tiers
+
+By default every provisioned wallet is ownerless — `owner_id` unset — which means ANY caller
+holding the Privy app secret can mutate it via `wallets().update()`, not just this Enforcer.
+Nothing else in this repo does that today, but it's a wider blast radius than it needs to be.
+
+Two scripts close it, opt-in:
+
+1. `scripts/setup-authorization-quorum.ts` generates a P-256 keypair, registers it as a 1-of-1
+   Privy key quorum, and prints `PRIVY_ENFORCER_AUTHORIZATION_KEY` /
+   `PRIVY_ENFORCER_QUORUM_ID` to add to `.env` (both this process's and web's — `POST
+   /api/agents/provision` reads the quorum id to give new wallets an owner at creation).
+2. `scripts/migrate-existing-wallets.ts` backfills any wallet provisioned before that — setting
+   `owner_id` on an ownerless wallet needs no signature, so this runs with app-secret authority
+   alone, once, and is safe to re-run (it skips anything already owned).
+
+After both, this Enforcer is the only thing that can write to an agent's wallet — verified live
+this session: an unauthenticated `wallets().update()` against an owned wallet 401s, and the exact
+same call with `authorization_context: { authorization_private_keys: [...] }` succeeds. This is
+deliberately a single 1-of-1 tier scoped to routine policy sync, not the human multi-signer tiers
+`web/lib/approvals.ts` builds on Privy key quorums for org-level actions — the Enforcer needs to
+sync a policy on every mandate amendment without waiting on a human, and a wider quorum here would
+mean an amendment can't take effect until someone signs off on it reaching Privy at all.

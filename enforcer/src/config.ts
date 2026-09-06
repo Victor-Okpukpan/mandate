@@ -44,6 +44,32 @@ export function loadPrivyCredentials() {
 }
 
 /**
+ * The Enforcer's OWN Privy authorization key — distinct from `loadEnforcerAccount`'s Ethereum
+ * signing key, which authorizes on-chain `syncMandate`/`heartbeat` calls, not Privy API calls.
+ *
+ * Optional, and absent by default: a wallet `wallets().create()` provisions has no `owner_id` at
+ * all, so `privyPolicy.ts`'s `wallets().update()` calls work with app-secret authority alone —
+ * exactly today's behavior, unchanged when this isn't configured. The gap that leaves: an
+ * ownerless wallet can be mutated by ANY caller holding the app secret, not just this Enforcer —
+ * every route under `web/app/api/**`, for instance, could in principle call `wallets().update()`
+ * on an agent's wallet too, even though nothing in this repo does.
+ *
+ * Once `enforcer/scripts/setup-authorization-quorum.ts` has been run and its output set here,
+ * `POST /api/agents/provision` starts giving every NEW wallet an `owner_id` pointed at that
+ * quorum, and this key becomes the only thing that can mutate it thereafter — closing that gap
+ * without requiring human sign-off on every routine policy sync (a 1-of-1 quorum containing only
+ * this key, not a human-multisig tier; see `enforcer/README.md`'s "Wallet ownership tiers"
+ * section for how this composes with `web/lib/approvals.ts`'s higher, human-signed tiers).
+ * `enforcer/scripts/migrate-existing-wallets.ts` backfills wallets provisioned before this existed.
+ */
+export function loadEnforcerAuthorizationContext():
+  | { authorization_private_keys: string[] }
+  | undefined {
+  const key = process.env.PRIVY_ENFORCER_AUTHORIZATION_KEY;
+  return key ? { authorization_private_keys: [key] } : undefined;
+}
+
+/**
  * The single-org fallback — one hard-coded registrar/anchor/treasury, exactly what this function
  * did before `MandateOrgFactory`/`ArcVaultFactory` existed. `orgSupervisor.ts` uses this only when
  * no factory is configured; once one is, every org (including this one, if it was created through

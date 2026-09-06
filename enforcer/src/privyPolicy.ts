@@ -1,6 +1,12 @@
 import { PrivyClient } from "@privy-io/node";
 import type { Address } from "viem";
 
+/** Matches `config.ts`'s `loadEnforcerAuthorizationContext()` return shape — kept local rather
+ *  than importing the SDK's own `AuthorizationContext` type here, since only this one field is
+ *  ever used. `undefined` means "wallet has no owner, app-secret authority is enough" — today's
+ *  behavior for every wallet this Enforcer has ever touched. */
+type WalletAuthorizationContext = { authorization_private_keys: string[] } | undefined;
+
 /**
  * Compiles one mandate's terms into a Privy conditional policy — the fast, stateless pre-filter.
  * Per SPONSOR-NOTES §3.1b / §4.5: Privy enforces the per-tx cap and the recipient allowlist here;
@@ -143,13 +149,17 @@ export async function syncPolicyForWallet(
   walletId: string,
   mandateNode: string,
   terms: MandateTermsForPolicy,
+  authorizationContext?: WalletAuthorizationContext,
 ): Promise<{ policyId: string }> {
   const wallet = await privy.wallets().get(walletId);
   const existingPolicyId = wallet.policy_ids?.[0];
 
   if (!existingPolicyId) {
     const { policyId } = await createPolicyForAgent(privy, mandateNode, terms);
-    await privy.wallets().update(walletId, { policy_ids: [policyId] });
+    await privy.wallets().update(walletId, {
+      policy_ids: [policyId],
+      ...(authorizationContext && { authorization_context: authorizationContext }),
+    });
     return { policyId };
   }
 
@@ -158,7 +168,10 @@ export async function syncPolicyForWallet(
   });
   // Idempotent — the wallet already carries this policy id if it got here via the branch above,
   // but a wallet whose policy_ids were set by some other path might not, so keep it explicit.
-  await privy.wallets().update(walletId, { policy_ids: [updated.id] });
+  await privy.wallets().update(walletId, {
+    policy_ids: [updated.id],
+    ...(authorizationContext && { authorization_context: authorizationContext }),
+  });
   return { policyId: updated.id };
 }
 
@@ -169,7 +182,14 @@ export async function syncPolicyForWallet(
  * policy down to a bare `DENY *`; does nothing (silently) if the wallet was never given a policy,
  * since there's nothing to close off.
  */
-export async function revokePolicyForWallet(privy: PrivyClient, walletId: string): Promise<void> {
+export async function revokePolicyForWallet(
+  privy: PrivyClient,
+  walletId: string,
+  // Unused today — `policies().update()` isn't itself owned, only the wallet is — kept for
+  // signature symmetry with `syncPolicyForWallet` and because rewriting the policy is exactly the
+  // kind of write a future stricter model might want the same guard on.
+  _authorizationContext?: WalletAuthorizationContext,
+): Promise<void> {
   const wallet = await privy.wallets().get(walletId);
   const existingPolicyId = wallet.policy_ids?.[0];
   if (!existingPolicyId) return;
