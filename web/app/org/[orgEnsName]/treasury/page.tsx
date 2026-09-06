@@ -70,6 +70,22 @@ function TreasuryView({ treasury, registrar }: { treasury: Address; registrar: A
     query: { enabled: agents.length > 0 },
   });
 
+  // `accounts(agent).spentAccum` is the raw leaky-bucket accumulator as of its last write — it
+  // over-reports once time has passed since the agent's last spend, because it hasn't decayed yet.
+  // `spentNow` is the same value read through `_decayedSpent`, which is what the contract itself
+  // actually checks against `budgetTotal` on the next spend — this column must show that, not the
+  // stale raw figure, or an agent can look maxed out here while still able to spend freely.
+  const { data: spentNowResults } = useReadContracts({
+    contracts: agents.map((agent) => ({
+      address: treasury,
+      abi: AgentTreasuryAbi,
+      functionName: "spentNow" as const,
+      args: [agent] as const,
+      chainId: arcTestnet.id,
+    })),
+    query: { enabled: agents.length > 0, refetchInterval: 15_000 },
+  });
+
   // v2's cap base is (totalDeposited - totalWithdrawn), not totalDeposited alone — liquidity the
   // org already withdrew is no longer backing anything. Mirrored here so this tile never disagrees
   // with what the contract itself will actually enforce on the next spend.
@@ -114,13 +130,14 @@ function TreasuryView({ treasury, registrar }: { treasury: Address; registrar: A
               <tbody>
                 {agents.map((agent, i) => {
                   const account = accounts?.[i]?.result as readonly [bigint, bigint, bigint, bigint] | undefined;
+                  const spentNow = spentNowResults?.[i]?.result as bigint | undefined;
                   return (
                     <Tr key={agent}>
                       <Td>
                         <MonoValue value={agent} className="text-secondary" />
                       </Td>
                       <Td className="tnum text-secondary">
-                        {account ? `$${fromErc20Usdc(account[0])}` : "—"}
+                        {spentNow !== undefined ? `$${fromErc20Usdc(spentNow)}` : "—"}
                       </Td>
                       <Td className="tnum text-secondary">
                         {account ? `$${fromErc20Usdc(account[1])}` : "—"}
