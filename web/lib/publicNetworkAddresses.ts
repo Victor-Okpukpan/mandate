@@ -21,5 +21,7 @@ export function getPublicArcAddresses() {
   return {
     usdc: (process.env.NEXT_PUBLIC_ARC_USDC ??
       "0x3600000000000000000000000000000000000000") as Address,
+    erc8004Identity: (process.env.NEXT_PUBLIC_ARC_ERC8004_IDENTITY ??
+      "0x8004A818BFB912233c491871b3d84c89A494BD9e") as Address,
   };
 }

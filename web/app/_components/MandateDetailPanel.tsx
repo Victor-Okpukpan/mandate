@@ -6,8 +6,10 @@ import { MonoValue } from "@mandate/ui/components/MonoValue";
 import { Countdown } from "@mandate/ui/components/Countdown";
 import { Eyebrow, RuleLabel } from "@mandate/ui/components/Type";
 import { fromErc20Usdc } from "@mandate/shared/decimals";
+import { BINDING_KEYS } from "@mandate/shared/ensKeys";
 import { useMandateDetail } from "../../lib/useMandateDetail";
 import { usePrivyMandateStatus, type PrivyPolicyRule } from "../../lib/usePrivyMandateStatus";
+import { useIdentityVerification } from "../../lib/useIdentityVerification";
 import type { DeployedAddresses } from "../../lib/addresses";
 
 interface MandateDetailPanelProps {
@@ -18,16 +20,52 @@ interface MandateDetailPanelProps {
   revoking?: boolean;
 }
 
-function RecordRow({ label, value }: { label: string; value: string }) {
+function RecordRow({ label, value, badge }: { label: string; value: string; badge?: React.ReactNode }) {
   const empty = value.length === 0;
   return (
     <div className="flex items-baseline justify-between gap-4 py-2 text-[13px]">
       <span className="shrink-0 font-mono text-tertiary">{label}</span>
-      <span className={`truncate text-right font-mono ${empty ? "text-disabled" : "text-secondary"}`}>
-        {empty ? "—" : value}
+      <span className="flex min-w-0 items-center justify-end gap-2">
+        <span className={`truncate text-right font-mono ${empty ? "text-disabled" : "text-secondary"}`}>
+          {empty ? "—" : value}
+        </span>
+        {badge}
       </span>
     </div>
   );
+}
+
+/**
+ * ✓/✗ against the REAL Arc ERC-8004 IdentityRegistry, not the ENS text record's own say-so — see
+ * `useIdentityVerification.ts`'s NatSpec for why `bindIdentity` alone can never be trusted as
+ * verification. "unset" (no id claimed yet) renders nothing, same as an empty record.
+ */
+function IdentityBadge({ agentIdText, agentWallet }: { agentIdText: string; agentWallet?: `0x${string}` }) {
+  const verification = useIdentityVerification(agentIdText || undefined, agentWallet);
+  switch (verification.status) {
+    case "unset":
+      return null;
+    case "loading":
+      return <span className="font-mono text-[11px] text-tertiary">checking…</span>;
+    case "verified":
+      return (
+        <span className="font-mono text-[11px] text-live" title="getAgentWallet() on the real Arc registry matches this mandate's agentWallet">
+          ✓ verified
+        </span>
+      );
+    case "not-found":
+      return (
+        <span className="font-mono text-[11px] text-revoked" title="No such agent id on the real Arc IdentityRegistry">
+          ✗ not found
+        </span>
+      );
+    case "mismatch":
+      return (
+        <span className="font-mono text-[11px] text-revoked" title={`Registry says this id's wallet is ${verification.realWallet}`}>
+          ✗ wallet mismatch
+        </span>
+      );
+  }
 }
 
 /** One Privy policy rule, rendered as the actual condition it compiles to — "ALLOW
@@ -86,10 +124,8 @@ function Plane({
  * source of truth for what a mandate "is" across all three surfaces.
  */
 export function MandateDetailPanel({ node, state, addresses, onRevoke, revoking }: MandateDetailPanelProps) {
-  const { mandate, agentWallet, mandateRecords, agentRecords, anchor, account } = useMandateDetail(
-    node,
-    addresses,
-  );
+  const { mandate, agentWallet, mandateRecords, agentRecords, bindingRecords, anchor, account } =
+    useMandateDetail(node, addresses);
   const privy = usePrivyMandateStatus(agentWallet);
 
   const budgetTotal = mandate ? fromErc20Usdc(mandate.terms.budgetTotal) : undefined;
@@ -141,6 +177,20 @@ export function MandateDetailPanel({ node, state, addresses, onRevoke, revoking 
       <Plane eyebrow="Agent-writable" title="agent.*">
         {agentRecords.map((r) => (
           <RecordRow key={r.key} label={r.key} value={r.value} />
+        ))}
+      </Plane>
+      <Plane eyebrow="Principal-written · identity, not authority" title="agent.arc.wallet / erc8004 / model">
+        {bindingRecords.map((r) => (
+          <RecordRow
+            key={r.key}
+            label={r.key}
+            value={r.value}
+            badge={
+              r.key === BINDING_KEYS.erc8004Id ? (
+                <IdentityBadge agentIdText={r.value} agentWallet={agentWallet} />
+              ) : undefined
+            }
+          />
         ))}
       </Plane>
 

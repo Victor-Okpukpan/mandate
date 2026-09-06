@@ -9,13 +9,14 @@ import {
   AgentTreasuryAbi,
   PermissionedResolverAbi,
 } from "@mandate/shared/abis";
-import { MANDATE_KEYS, AGENT_KEYS } from "@mandate/shared/ensKeys";
+import { MANDATE_KEYS, AGENT_KEYS, BINDING_KEYS } from "@mandate/shared/ensKeys";
 import type { DeployedAddresses } from "./addresses";
 
 /** Ordered so the drawer/page render principal-written records before agent-written ones —
  *  the same visual order the security model implies (who can write it, most-restricted first). */
 const MANDATE_TEXT_KEYS = Object.values(MANDATE_KEYS).filter((k) => k !== MANDATE_KEYS.allowHuman);
 const AGENT_TEXT_KEYS = Object.values(AGENT_KEYS);
+const BINDING_TEXT_KEYS = Object.values(BINDING_KEYS);
 
 export interface MandateRecord {
   key: string;
@@ -61,6 +62,17 @@ export function useMandateDetail(node: Hex | undefined, addresses: DeployedAddre
     query: { enabled: Boolean(resolverAddress && node) },
   });
 
+  const { data: bindingTextResults } = useReadContracts({
+    contracts: BINDING_TEXT_KEYS.map((key) => ({
+      address: resolverAddress,
+      abi: PermissionedResolverAbi,
+      functionName: "text" as const,
+      args: node ? ([node, key] as const) : undefined,
+      chainId: sepolia.id,
+    })),
+    query: { enabled: Boolean(resolverAddress && node) },
+  });
+
   const agentWallet = mandate?.agentWallet;
 
   const { data: anchor } = useReadContract({
@@ -89,6 +101,10 @@ export function useMandateDetail(node: Hex | undefined, addresses: DeployedAddre
     key,
     value: String(agentTextResults?.[i]?.result ?? ""),
   }));
+  const bindingRecords: MandateRecord[] = BINDING_TEXT_KEYS.map((key, i) => ({
+    key,
+    value: String(bindingTextResults?.[i]?.result ?? ""),
+  }));
 
   return {
     mandate,
@@ -96,6 +112,7 @@ export function useMandateDetail(node: Hex | undefined, addresses: DeployedAddre
     agentWallet,
     mandateRecords,
     agentRecords,
+    bindingRecords,
     anchor,
     account,
   };
