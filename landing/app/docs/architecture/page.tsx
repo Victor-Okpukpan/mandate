@@ -1,11 +1,17 @@
-import { Prose, DocsTable } from "../_components/Prose";
+import { Prose, DocsTable, DocsJsonLd } from "../_components/Prose";
 import { ArchitectureDiagram } from "../_components/ArchitectureDiagram";
+import { buildMetadata } from "../../../lib/seo";
 
-export const metadata = { title: "Architecture" };
+const TITLE = "Architecture: authority, enforcement, and money planes";
+const DESCRIPTION =
+  "Why an AI agent's authority, its off-chain enforcement, and its actual money movement live on three separate planes — Sepolia, the Enforcer, and Arc — and what changed from the original design.";
+
+export const metadata = buildMetadata({ title: TITLE, description: DESCRIPTION, path: "/docs/architecture" });
 
 export default function ArchitecturePage() {
   return (
     <Prose>
+      <DocsJsonLd title={TITLE} description={DESCRIPTION} path="/docs/architecture" />
       <h1>Architecture</h1>
       <p>
         Three planes, one source of truth. Identity and permissions belong on Ethereum, where

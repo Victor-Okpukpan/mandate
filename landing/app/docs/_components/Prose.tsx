@@ -1,4 +1,39 @@
 import type { ReactNode } from "react";
+import { SITE_NAME, SITE_URL } from "@mandate/ui/seo";
+
+/**
+ * `TechArticle` + `BreadcrumbList` JSON-LD for one docs page. Kept next to `Prose` rather than in
+ * `lib/seo.ts` because every docs page already imports from here, and this is markup, not a
+ * `Metadata` object — `buildMetadata` and this serve the two different halves of a page's SEO
+ * (head tags vs. structured data) and don't share a shape worth unifying.
+ */
+export function DocsJsonLd({ title, description, path }: { title: string; description: string; path: string }) {
+  const url = `${SITE_URL}${path}`;
+  const articleJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "TechArticle",
+    headline: title,
+    description,
+    url,
+    isPartOf: { "@type": "WebSite", name: SITE_NAME, url: SITE_URL },
+  };
+  const breadcrumbJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Docs", item: `${SITE_URL}/docs` },
+      { "@type": "ListItem", position: 2, name: title, item: url },
+    ],
+  };
+  return (
+    <>
+      {/* eslint-disable-next-line react/no-danger -- static, hand-authored JSON, no user input */}
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(articleJsonLd) }} />
+      {/* eslint-disable-next-line react/no-danger */}
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
+    </>
+  );
+}
 
 /**
  * Shared docs typography — deliberate rhythm via descendant selectors rather than a generic

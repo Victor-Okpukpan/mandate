@@ -1,10 +1,16 @@
-import { Prose, DocsTable } from "../_components/Prose";
+import { Prose, DocsTable, DocsJsonLd } from "../_components/Prose";
+import { buildMetadata } from "../../../lib/seo";
 
-export const metadata = { title: "Privy" };
+const TITLE = "Privy wallet policies for AI agents, and their limits";
+const DESCRIPTION =
+  "What Privy's conditional wallet policies enforce for an AI agent's spending, where those limits stop, and why a rolling cumulative budget still needs an onchain ledger alongside them.";
+
+export const metadata = buildMetadata({ title: TITLE, description: DESCRIPTION, path: "/docs/privy" });
 
 export default function PrivyDocsPage() {
   return (
     <Prose>
+      <DocsJsonLd title={TITLE} description={DESCRIPTION} path="/docs/privy" />
       <h1>Privy — a spend management tool for organizations</h1>
       <p>
         Remove Privy and agents cannot sign at all. It is one of two independent enforcement gates

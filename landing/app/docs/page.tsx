@@ -1,11 +1,17 @@
-import { Prose } from "./_components/Prose";
+import { Prose, DocsJsonLd } from "./_components/Prose";
+import { buildMetadata } from "../../lib/seo";
 
-export const metadata = { title: "Docs" };
+const TITLE = "How MANDATE works — spending mandates for AI agents";
+const DESCRIPTION =
+  "How an ENS subname becomes an AI agent's spending mandate, enforced off-chain by Privy and on-chain by Arc — the three-plane model, in one page.";
+
+export const metadata = buildMetadata({ title: TITLE, description: DESCRIPTION, path: "/docs" });
 
 export default function DocsOverviewPage() {
   return (
     <Prose>
-      <h1>Overview</h1>
+      <DocsJsonLd title={TITLE} description={DESCRIPTION} path="/docs" />
+      <h1>How MANDATE works</h1>
       <p>
         MANDATE issues each of an organization&rsquo;s AI agents an ENSv2 subname that is
         non-transferable, self-expiring, and instantly revocable. The subname&rsquo;s resolver

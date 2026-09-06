@@ -1,10 +1,16 @@
-import { Prose, DocsTable, Callout } from "../_components/Prose";
+import { Prose, DocsTable, Callout, DocsJsonLd } from "../_components/Prose";
+import { buildMetadata } from "../../../lib/seo";
 
-export const metadata = { title: "ENS" };
+const TITLE = "ENS subnames as AI agent permissions";
+const DESCRIPTION =
+  "How an ENSv2 subname becomes an AI agent's entire spending authority — soulbound, self-expiring, and readable but not editable by the agent it names.";
+
+export const metadata = buildMetadata({ title: TITLE, description: DESCRIPTION, path: "/docs/ens" });
 
 export default function EnsDocsPage() {
   return (
     <Prose>
+      <DocsJsonLd title={TITLE} description={DESCRIPTION} path="/docs/ens" />
       <h1>ENS — central, not cosmetic</h1>
       <p>
         Delete the ENSv2 layer from this project and there is no product left. Every mandate{" "}

@@ -1,10 +1,16 @@
-import { Prose, Callout } from "../_components/Prose";
+import { Prose, Callout, DocsJsonLd } from "../_components/Prose";
+import { buildMetadata } from "../../../lib/seo";
 
-export const metadata = { title: "Security" };
+const TITLE = "Security model and known limitations";
+const DESCRIPTION =
+  "The threat model, the Enforcer's own trust assumptions, and every known limitation disclosed in full — allowlist inheritance, interest accrual, and ERC-8183 authorization included.";
+
+export const metadata = buildMetadata({ title: TITLE, description: DESCRIPTION, path: "/docs/security" });
 
 export default function SecurityDocsPage() {
   return (
     <Prose>
+      <DocsJsonLd title={TITLE} description={DESCRIPTION} path="/docs/security" />
       <h1>Security &amp; known limitations</h1>
       <p>
         Every limitation below is a deliberate, disclosed tradeoff — not an oversight found later.

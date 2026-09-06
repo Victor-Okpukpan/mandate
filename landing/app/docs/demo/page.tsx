@@ -1,6 +1,15 @@
 import { Prose } from "../_components/Prose";
+import { buildMetadata } from "../../../lib/seo";
 
-export const metadata = { title: "Demo" };
+// A presenter's run-of-show for a live walkthrough — no search value, and already unlinked from
+// the footer (see Footer.tsx's own comment). noindex, not excluded from the sitemap by omission
+// alone: this keeps that intent explicit here too, next to the metadata it governs.
+export const metadata = buildMetadata({
+  title: "Live demo walkthrough",
+  description: "A timed run-of-show for a live MANDATE demo.",
+  path: "/docs/demo",
+  index: false,
+});
 
 const BEATS: Array<{ time: string; title: string; body: string }> = [
   {

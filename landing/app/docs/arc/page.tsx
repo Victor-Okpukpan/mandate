@@ -1,11 +1,17 @@
-import { Prose, DocsTable, Callout } from "../_components/Prose";
+import { Prose, DocsTable, Callout, DocsJsonLd } from "../_components/Prose";
+import { buildMetadata } from "../../../lib/seo";
 
-export const metadata = { title: "Arc" };
+const TITLE = "Arc: USDC-gas payments for autonomous agents";
+const DESCRIPTION =
+  "Why an AI agent's payments settle on Arc, where gas is USDC and the org treasury behaves as a revolving credit facility — plus how ERC-8004 and ERC-8183 compose into it.";
+
+export const metadata = buildMetadata({ title: TITLE, description: DESCRIPTION, path: "/docs/arc" });
 
 export default function ArcDocsPage() {
   return (
     <Prose>
-      <h1>Arc</h1>
+      <DocsJsonLd title={TITLE} description={DESCRIPTION} path="/docs/arc" />
+      <h1>Arc: USDC-gas payments for agents</h1>
       <p>
         MANDATE enters both Arc bounties, explicitly: <strong>Best Agentic Economy</strong> (via
         ERC-8004 identity/reputation and ERC-8183 job escrow, built from the Circle Agent Stack)
