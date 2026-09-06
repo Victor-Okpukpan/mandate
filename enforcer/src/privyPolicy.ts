@@ -1,4 +1,4 @@
-import { PrivyClient } from "@privy-io/server-auth";
+import { PrivyClient } from "@privy-io/node";
 import type { Address } from "viem";
 
 /**
@@ -35,6 +35,14 @@ import type { Address } from "viem";
  *    still matches a qualifying transaction. Fixed: `revokePolicyForWallet` rewrites the policy
  *    down to a single `DENY *` rule, so revocation fails closed on the Privy layer too, not only
  *    on-chain.
+ *
+ * MIGRATION NOTES (`@privy-io/server-auth` → `@privy-io/node`, both verified live against the
+ * project's own Privy app before and after):
+ * 6. The facade's field names are snake_case (`chain_type`, `field_source`) where server-auth used
+ *    camelCase (`chainType`, `fieldSource`) — a straight rename, same values, same live-verified
+ *    "functionName.argumentName" calldata field format from note 3.
+ * 7. `wallets().get(id)`/`.update(id, params)` take the wallet ID positionally, not as `{ id }`;
+ *    the response field is `wallet.policy_ids`, not `wallet.policyIds`.
  */
 
 export interface MandateTermsForPolicy {
@@ -70,7 +78,7 @@ const DENY_ALL_RULE = {
 };
 
 /** The one rule a qualifying payment must satisfy, all three conditions ANDed. Extracted so
- *  `ensurePolicyForAgent` (create path) and `syncPolicyForWallet` (update path) build byte-for-byte
+ *  `createPolicyForAgent` (create path) and `syncPolicyForWallet` (update path) build byte-for-byte
  *  the same rule from the same terms. */
 function buildMandateGateRule(terms: MandateTermsForPolicy) {
   return {
@@ -79,20 +87,20 @@ function buildMandateGateRule(terms: MandateTermsForPolicy) {
     action: "ALLOW" as const,
     conditions: [
       {
-        fieldSource: "ethereum_transaction" as const,
+        field_source: "ethereum_transaction" as const,
         field: "to" as const,
         operator: "eq" as const,
         value: terms.agentTreasury,
       },
       {
-        fieldSource: "ethereum_calldata" as const,
+        field_source: "ethereum_calldata" as const,
         field: "payTo.amount",
         operator: "lte" as const,
         value: terms.perTxCapUsdcBaseUnits.toString(),
         abi: PAY_TO_ABI,
       },
       {
-        fieldSource: "ethereum_calldata" as const,
+        field_source: "ethereum_calldata" as const,
         field: "payTo.to",
         operator: "in" as const,
         value: terms.allowedRecipients,
@@ -114,10 +122,10 @@ export async function createPolicyForAgent(
   terms: MandateTermsForPolicy,
 ): Promise<{ policyId: string }> {
   const policyName = `mandate-${mandateNode.slice(0, 10)}`;
-  const policy = await privy.walletApi.createPolicy({
+  const policy = await privy.policies().create({
     name: policyName,
     version: "1.0",
-    chainType: "ethereum",
+    chain_type: "ethereum",
     rules: [buildMandateGateRule(terms), DENY_ALL_RULE],
   });
   return { policyId: policy.id };
@@ -125,8 +133,8 @@ export async function createPolicyForAgent(
 
 /**
  * The routine path — call this on every sync, not just the first one. Resolves the wallet's
- * current policy (there is no `listPolicies`, so `getWallets`'s own `policyIds` is the only way to
- * find it) and `updatePolicy`s it in place with the freshly-compiled rule; only creates a new
+ * current policy (there is no `listPolicies`, so `getWallets`'s own `policy_ids` is the only way
+ * to find it) and `updatePolicy`s it in place with the freshly-compiled rule; only creates a new
  * policy the first time this wallet has none. This is what stops every amendment from orphaning a
  * duplicate.
  */
@@ -136,22 +144,21 @@ export async function syncPolicyForWallet(
   mandateNode: string,
   terms: MandateTermsForPolicy,
 ): Promise<{ policyId: string }> {
-  const wallet = await privy.walletApi.getWallet({ id: walletId });
-  const existingPolicyId = wallet.policyIds?.[0];
+  const wallet = await privy.wallets().get(walletId);
+  const existingPolicyId = wallet.policy_ids?.[0];
 
   if (!existingPolicyId) {
     const { policyId } = await createPolicyForAgent(privy, mandateNode, terms);
-    await privy.walletApi.updateWallet({ id: walletId, policyIds: [policyId] });
+    await privy.wallets().update(walletId, { policy_ids: [policyId] });
     return { policyId };
   }
 
-  const updated = await privy.walletApi.updatePolicy({
-    id: existingPolicyId,
+  const updated = await privy.policies().update(existingPolicyId, {
     rules: [buildMandateGateRule(terms), DENY_ALL_RULE],
   });
   // Idempotent — the wallet already carries this policy id if it got here via the branch above,
-  // but a wallet whose policyIds were set by some other path might not, so keep it explicit.
-  await privy.walletApi.updateWallet({ id: walletId, policyIds: [updated.id] });
+  // but a wallet whose policy_ids were set by some other path might not, so keep it explicit.
+  await privy.wallets().update(walletId, { policy_ids: [updated.id] });
   return { policyId: updated.id };
 }
 
@@ -163,8 +170,8 @@ export async function syncPolicyForWallet(
  * since there's nothing to close off.
  */
 export async function revokePolicyForWallet(privy: PrivyClient, walletId: string): Promise<void> {
-  const wallet = await privy.walletApi.getWallet({ id: walletId });
-  const existingPolicyId = wallet.policyIds?.[0];
+  const wallet = await privy.wallets().get(walletId);
+  const existingPolicyId = wallet.policy_ids?.[0];
   if (!existingPolicyId) return;
-  await privy.walletApi.updatePolicy({ id: existingPolicyId, rules: [DENY_ALL_RULE] });
+  await privy.policies().update(existingPolicyId, { rules: [DENY_ALL_RULE] });
 }

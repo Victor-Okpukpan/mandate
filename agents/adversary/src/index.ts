@@ -1,5 +1,5 @@
 import { query } from "@anthropic-ai/claude-agent-sdk";
-import { PrivyClient } from "@privy-io/server-auth";
+import { PrivyClient } from "@privy-io/node";
 import { getRpcUrls } from "@mandate/shared/addresses";
 import { makeChainClients, makeDevSigner, makePrivySigner } from "@mandate/agents-shared";
 import { buildRawTools } from "./rawTools.js";
@@ -41,13 +41,9 @@ async function main() {
   const signer = devKey
     ? makeDevSigner(devKey as `0x${string}`, getRpcUrls())
     : makePrivySigner(
-        // Matches the Enforcer's own PrivyClient construction (enforcer/src/index.ts) — if the
-        // org's Privy app has a registered authorization keypair, wallet RPC calls fail without it.
-        new PrivyClient(requireEnv("PRIVY_APP_ID"), requireEnv("PRIVY_APP_SECRET"), {
-          walletApi: process.env.PRIVY_AUTHORIZATION_PRIVATE_KEY
-            ? { authorizationPrivateKey: process.env.PRIVY_AUTHORIZATION_PRIVATE_KEY }
-            : undefined,
-        }),
+        // @privy-io/node's PrivyClient has no constructor-level authorization-key option —
+        // matches enforcer/src/index.ts's own construction.
+        new PrivyClient({ appId: requireEnv("PRIVY_APP_ID"), appSecret: requireEnv("PRIVY_APP_SECRET") }),
         requireEnv("AGENT_PRIVY_WALLET_ID"),
         requireEnv("AGENT_ARC_WALLET_ADDRESS") as `0x${string}`,
       );

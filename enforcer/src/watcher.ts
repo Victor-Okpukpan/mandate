@@ -1,6 +1,6 @@
 import { sepolia } from "viem/chains";
 import { createPublicClient, http, type Address, type Hex } from "viem";
-import { PrivyClient } from "@privy-io/server-auth";
+import { PrivyClient } from "@privy-io/node";
 import { MandateAnchorAbi, MandateRegistrarAbi, PermissionedResolverAbi } from "@mandate/shared/abis";
 import { MANDATE_KEYS } from "@mandate/shared/ensKeys";
 import { parseAllowHuman } from "@mandate/shared/allowHuman";

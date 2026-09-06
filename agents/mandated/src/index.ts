@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { PrivyClient } from "@privy-io/server-auth";
+import { PrivyClient } from "@privy-io/node";
 import { getRpcUrls } from "@mandate/shared/addresses";
 import { makeChainClients, makeDevSigner, makePrivySigner, runMandatedAgent } from "@mandate/agents-shared";
 import { ROLE_PROMPTS, type AgentRole } from "./roles.js";
@@ -25,16 +25,10 @@ async function main() {
   const signer = devKey
     ? makeDevSigner(devKey as `0x${string}`, getRpcUrls())
     : makePrivySigner(
-        // Matches the Enforcer's own PrivyClient construction (enforcer/src/index.ts) — if the
-        // org's Privy app has a registered authorization keypair, wallet RPC calls fail without
-        // this, per the SDK's own docstring. Omitting it here while the Enforcer passed it was
-        // the actual repo state before this fix; harmless for an app with no authorization key,
-        // silently broken for one that has it.
-        new PrivyClient(requireEnv("PRIVY_APP_ID"), requireEnv("PRIVY_APP_SECRET"), {
-          walletApi: process.env.PRIVY_AUTHORIZATION_PRIVATE_KEY
-            ? { authorizationPrivateKey: process.env.PRIVY_AUTHORIZATION_PRIVATE_KEY }
-            : undefined,
-        }),
+        // @privy-io/node's PrivyClient has no constructor-level authorization-key option —
+        // matches enforcer/src/index.ts's own construction. See that file's comment on why
+        // dropping PRIVY_AUTHORIZATION_PRIVATE_KEY here regresses nothing (it was always empty).
+        new PrivyClient({ appId: requireEnv("PRIVY_APP_ID"), appSecret: requireEnv("PRIVY_APP_SECRET") }),
         requireEnv("AGENT_PRIVY_WALLET_ID"),
         requireEnv("AGENT_ARC_WALLET_ADDRESS") as `0x${string}`,
       );

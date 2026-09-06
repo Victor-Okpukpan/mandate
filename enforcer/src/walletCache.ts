@@ -1,8 +1,8 @@
-import type { PrivyClient } from "@privy-io/server-auth";
+import type { PrivyClient } from "@privy-io/node";
 import type { Address } from "viem";
 
 /**
- * TTL-cached `walletApi.getWallets()` lookup, shared across every org a single Enforcer process
+ * TTL-cached `wallets().list()` lookup, shared across every org a single Enforcer process
  * watches. `watcher.ts` used to call the uncached version once per sync — fine for one org, but
  * with N orgs sharing one Enforcer process that's N times the Privy API traffic for state that
  * only changes when a new agent is provisioned, which happens far less often than mandates sync.
@@ -16,14 +16,12 @@ export function createWalletCache(privy: PrivyClient, ttlMs = 30_000) {
 
   async function fetchAll(): Promise<Map<Address, string>> {
     const byAddress = new Map<Address, string>();
-    let cursor: string | undefined;
-    do {
-      const page = await privy.walletApi.getWallets({ chainType: "ethereum", cursor });
-      for (const wallet of page.data) {
-        byAddress.set(wallet.address.toLowerCase() as Address, wallet.id);
-      }
-      cursor = page.nextCursor;
-    } while (cursor);
+    // @privy-io/node's list() is an async-iterable PagePromise — it walks every page itself,
+    // no manual cursor loop needed (unlike server-auth's getWallets(), which returned one page
+    // per call and required looping on `nextCursor`/`data` by hand).
+    for await (const wallet of privy.wallets().list({ chain_type: "ethereum" })) {
+      byAddress.set(wallet.address.toLowerCase() as Address, wallet.id);
+    }
     return byAddress;
   }
 

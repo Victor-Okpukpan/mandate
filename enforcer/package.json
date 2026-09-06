@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@mandate/shared": "workspace:*",
-    "@privy-io/server-auth": "^1.32.5",
+    "@privy-io/node": "0.34.0",
     "ethers": "^6.17.0",
     "viem": "^2.56.3"
   },

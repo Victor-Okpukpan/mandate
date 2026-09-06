@@ -1,7 +1,7 @@
 import { getPrivyServerClient, requireAuthenticatedUser, UnauthorizedError } from "../../../../lib/privy";
 
 /**
- * Creates a real Privy server wallet for a new agent — `walletApi.createWallet`. This is the
+ * Creates a real Privy server wallet for a new agent — `wallets().create`. This is the
  * step that never existed in the repo before this route: nothing anywhere created an agent
  * wallet, so `/mandate/new` asked for an "Agent wallet" address that no part of the product could
  * produce. This route is that missing first step. The composer calls it, gets back a real
@@ -24,7 +24,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const wallet = await getPrivyServerClient().walletApi.createWallet({ chainType: "ethereum" });
+    const wallet = await getPrivyServerClient().wallets().create({ chain_type: "ethereum" });
     return Response.json({ address: wallet.address, walletId: wallet.id });
   } catch (err) {
     return Response.json(

@@ -1,5 +1,5 @@
 import "server-only";
-import { PrivyClient } from "@privy-io/server-auth";
+import { PrivyClient } from "@privy-io/node";
 
 /**
  * The one place `PRIVY_APP_SECRET` is ever read. Every `web/app/api/**` route imports this
@@ -27,12 +27,10 @@ export function getPrivyServerClient(): PrivyClient {
   if (cached) return cached;
   const appId = requireServerEnv("PRIVY_APP_ID");
   const appSecret = requireServerEnv("PRIVY_APP_SECRET");
-  const authorizationPrivateKey = process.env.PRIVY_AUTHORIZATION_PRIVATE_KEY;
-  cached = new PrivyClient(
-    appId,
-    appSecret,
-    authorizationPrivateKey ? { walletApi: { authorizationPrivateKey } } : undefined,
-  );
+  // @privy-io/node's PrivyClient has no constructor-level authorization-key option — a
+  // quorum-signed write now takes a per-call `authorization_context` instead. Nothing in this
+  // app currently makes such a write (see enforcer/src/index.ts's matching note).
+  cached = new PrivyClient({ appId, appSecret });
   return cached;
 }
 
@@ -55,6 +53,11 @@ export class UnauthorizedError extends Error {
  * client-side via `usePrivy().getAccessToken()`) before any route touches the wallet or policy
  * API. Every route in `web/app/api/**` calls this first — there is no route that trusts a bare
  * request. Throws `UnauthorizedError` on a missing/invalid token; callers turn that into a 401.
+ *
+ * `verifyAccessToken` here is the facade's own wrapper (`client.utils().auth()`), which manages
+ * fetching and caching the app's JWKS internally — unlike the standalone `verifyAccessToken`
+ * function this package also exports, which takes an explicit `verification_key` the caller
+ * would otherwise have to fetch and cache by hand via `client.apps().get(appId)`.
  */
 export async function requireAuthenticatedUser(request: Request) {
   const authHeader = request.headers.get("authorization");
@@ -62,7 +65,7 @@ export async function requireAuthenticatedUser(request: Request) {
   if (!token) throw new UnauthorizedError("Missing Authorization: Bearer <access token> header.");
 
   try {
-    return await getPrivyServerClient().verifyAuthToken(token);
+    return await getPrivyServerClient().utils().auth().verifyAccessToken(token);
   } catch (err) {
     throw new UnauthorizedError(
       `Access token failed verification: ${err instanceof Error ? err.message : String(err)}`,

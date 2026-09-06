@@ -1,6 +1,6 @@
 import { sepolia, arcTestnet } from "viem/chains";
 import { createPublicClient, http, type Address } from "viem";
-import type { PrivyClient } from "@privy-io/server-auth";
+import type { PrivyClient } from "@privy-io/node";
 import type { PrivateKeyAccount } from "viem/accounts";
 import { ArcVaultFactoryAbi, MandateAnchorAbi, MandateOrgFactoryAbi, MandateRegistrarAbi } from "@mandate/shared/abis";
 import { listOrgs, listVaults, joinOrgVaults, type OrgWithVault } from "@mandate/shared/orgs";

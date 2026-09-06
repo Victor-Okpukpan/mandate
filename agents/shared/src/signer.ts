@@ -1,4 +1,4 @@
-import { PrivyClient } from "@privy-io/server-auth";
+import { PrivyClient } from "@privy-io/node";
 import { privateKeyToAccount } from "viem/accounts";
 import { createWalletClient, http, type Address, type Hex } from "viem";
 import { arcTestnet, sepolia } from "viem/chains";
@@ -24,13 +24,18 @@ export function makePrivySigner(privy: PrivyClient, walletId: string, address: A
   return {
     address,
     async sendTransaction(chain, tx) {
-      const result = await privy.walletApi.ethereum.sendTransaction({
-        walletId,
+      // @privy-io/node: the friendly `wallets().ethereum().sendTransaction` wraps the raw RPC
+      // passthrough and nests the transaction one level deeper (`params.transaction`, not a bare
+      // `transaction` field) — verified against the installed .d.ts, and the response's `.hash`
+      // is flat on the result, not nested under `.data` the way the raw resource method returns it.
+      const result = await privy.wallets().ethereum().sendTransaction(walletId, {
         caip2: CAIP2[chain],
-        transaction: {
-          to: tx.to,
-          data: tx.data,
-          value: tx.value !== undefined ? `0x${tx.value.toString(16)}` : undefined,
+        params: {
+          transaction: {
+            to: tx.to,
+            data: tx.data,
+            value: tx.value !== undefined ? `0x${tx.value.toString(16)}` : undefined,
+          },
         },
       });
       return result.hash as Hex;

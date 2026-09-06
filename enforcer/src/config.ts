@@ -40,10 +40,6 @@ export function loadPrivyCredentials() {
   return {
     appId: requireEnv("PRIVY_APP_ID"),
     appSecret: requireEnv("PRIVY_APP_SECRET"),
-    // Only required if the org's Privy app has a registered authorization keypair (key-quorum
-    // signer-routed calls) — Privy's `privy-authorization-signature` header, per SPONSOR-NOTES
-    // §4.5. Optional: a simpler Privy app setup works without it.
-    authorizationPrivateKey: process.env.PRIVY_AUTHORIZATION_PRIVATE_KEY,
   };
 }
 
