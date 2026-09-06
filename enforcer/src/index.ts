@@ -1,22 +1,12 @@
 import { PrivyClient } from "@privy-io/server-auth";
-import {
-  HEARTBEAT_INTERVAL_MS,
-  loadDeployedAddresses,
-  loadEnforcerAccount,
-  loadPrivyCredentials,
-} from "./config.js";
-import { startWatcher } from "./watcher.js";
-import { startHeartbeatLoop } from "./heartbeat.js";
-import { getArcAddresses } from "@mandate/shared/addresses";
+import { loadEnforcerAccount, loadPrivyCredentials } from "./config.js";
+import { startOrgSupervisor } from "./orgSupervisor.js";
 
 async function main() {
   console.log("MANDATE Enforcer — starting");
 
   const account = loadEnforcerAccount();
   const { appId, appSecret, authorizationPrivateKey } = loadPrivyCredentials();
-  const { mandateRegistrar, mandateAnchor, rpc } = loadDeployedAddresses();
-  const { agentTreasury } = getArcAddresses();
-  if (!agentTreasury) throw new Error("ARC_AGENT_TREASURY not set");
 
   const privy = new PrivyClient(
     appId,
@@ -25,27 +15,11 @@ async function main() {
   );
   console.log(`[enforcer] signing as ${account.address}`);
 
-  const watcher = await startWatcher({
-    sepoliaRpcUrl: rpc.sepolia,
-    registrarAddress: mandateRegistrar,
-    anchorAddress: mandateAnchor,
-    agentTreasuryAddress: agentTreasury,
-    privy,
-    arcAccount: account,
-    arcRpcUrl: rpc.arc,
-  });
-
-  const stopHeartbeat = startHeartbeatLoop(
-    watcher.liveAgents,
-    watcher.arcClients,
-    mandateAnchor,
-    HEARTBEAT_INTERVAL_MS,
-  );
+  const supervisor = await startOrgSupervisor({ privy, arcAccount: account });
 
   const shutdown = () => {
     console.log("\n[enforcer] shutting down");
-    watcher.stop();
-    stopHeartbeat();
+    supervisor.stop();
     process.exit(0);
   };
   process.on("SIGINT", shutdown);

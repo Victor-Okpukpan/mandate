@@ -47,7 +47,13 @@ export function loadPrivyCredentials() {
   };
 }
 
-export function loadDeployedAddresses() {
+/**
+ * The single-org fallback — one hard-coded registrar/anchor/treasury, exactly what this function
+ * did before `MandateOrgFactory`/`ArcVaultFactory` existed. `orgSupervisor.ts` uses this only when
+ * no factory is configured; once one is, every org (including this one, if it was created through
+ * the factory) is discovered from `OrgCreated`/`VaultCreated` logs instead.
+ */
+export function loadSingleOrgFallback() {
   const sepolia = getSepoliaAddresses();
   const arc = getArcAddresses();
   if (!sepolia.mandateRegistrar) {
@@ -56,9 +62,25 @@ export function loadDeployedAddresses() {
   if (!arc.mandateAnchor) {
     throw new Error("ARC_MANDATE_ANCHOR not set — nowhere to sync to yet.");
   }
+  if (!arc.agentTreasury) {
+    throw new Error("ARC_AGENT_TREASURY not set — nowhere to sync to yet.");
+  }
   return {
     mandateRegistrar: sepolia.mandateRegistrar,
     mandateAnchor: arc.mandateAnchor,
+    agentTreasury: arc.agentTreasury,
+  };
+}
+
+/** The two platform factories — set once `DeployFactories.s.sol` has run. `undefined` on either
+ *  side means the platform hasn't been onboarded onto self-serve org creation yet, in which case
+ *  `orgSupervisor.ts` falls back to `loadSingleOrgFallback()`. */
+export function loadFactories() {
+  const sepolia = getSepoliaAddresses();
+  const arc = getArcAddresses();
+  return {
+    orgFactory: sepolia.mandateOrgFactory,
+    vaultFactory: arc.arcVaultFactory,
     rpc: getRpcUrls(),
   };
 }

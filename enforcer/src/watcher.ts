@@ -6,6 +6,7 @@ import { MANDATE_KEYS } from "@mandate/shared/ensKeys";
 import { parseAllowHuman } from "@mandate/shared/allowHuman";
 import { revokePolicyForWallet, syncPolicyForWallet } from "./privyPolicy.js";
 import { makeArcClients, submitSync, type SyncPayload } from "./arcSync.js";
+import type { WalletCache } from "./walletCache.js";
 import type { PrivateKeyAccount } from "viem/accounts";
 
 export interface WatcherDeps {
@@ -14,58 +15,11 @@ export interface WatcherDeps {
   anchorAddress: Address;
   agentTreasuryAddress: Address;
   privy: PrivyClient;
+  /** Shared across every org this Enforcer process watches — see `walletCache.ts`'s own
+   *  NatSpec-style comment on why this isn't fetched fresh per sync. */
+  wallets: WalletCache;
   arcAccount: PrivateKeyAccount;
   arcRpcUrl: string;
-}
-
-/**
- * Agent wallet address -> Privy wallet id. Previously a hand-maintained JSON file
- * (`wallet-registry.json`) that nothing ever wrote — every sync found it empty and skipped policy
- * sync entirely, so zero policies were ever created at runtime. `walletApi.getWallets()` already
- * returns `address` + `id` for every server wallet in the app, which is the same information the
- * file was meant to hold, live and without a second thing to keep in sync. Paginates because
- * `getWallets` returns at most one page per call.
- */
-async function loadWalletsByAddress(privy: PrivyClient): Promise<Map<Address, string>> {
-  const byAddress = new Map<Address, string>();
-  let cursor: string | undefined;
-  do {
-    const page = await privy.walletApi.getWallets({ chainType: "ethereum", cursor });
-    for (const wallet of page.data) {
-      byAddress.set(wallet.address.toLowerCase() as Address, wallet.id);
-    }
-    cursor = page.nextCursor;
-  } while (cursor);
-  return byAddress;
-}
-
-/** Per-agent nonce for `MandateAnchor.syncMandate` — strictly monotonic, per the contract's own
- *  invariant. Cached in memory after first use within a process, but ALWAYS seeded from the
- *  anchor's actual on-chain nonce the first time a given agent is synced — a fresh, in-memory-only
- *  counter would restart at 0 after any Enforcer restart and revert every sync thereafter with
- *  `MandateAnchor__NonceNotMonotonic` against an agent that already has anchor state. */
-const nonceByAgent = new Map<Address, bigint>();
-
-async function nextNonceFor(
-  agent: Address,
-  arcClients: ReturnType<typeof makeArcClients>,
-  anchorAddress: Address,
-): Promise<bigint> {
-  if (!nonceByAgent.has(agent)) {
-    const anchor = await arcClients.publicClient.readContract({
-      address: anchorAddress,
-      abi: MandateAnchorAbi,
-      functionName: "anchors",
-      args: [agent],
-    });
-    const [, , , , , , updatedAt, currentNonce] = anchor;
-    // updatedAt == 0 means this agent has never been synced — MandateAnchor's own
-    // isFirstSync check accepts any starting nonce in that case, so 0 is a safe start.
-    nonceByAgent.set(agent, updatedAt === 0n ? -1n : currentNonce);
-  }
-  const next = nonceByAgent.get(agent)! + 1n;
-  nonceByAgent.set(agent, next);
-  return next;
 }
 
 export async function startWatcher(deps: WatcherDeps) {
@@ -73,6 +27,35 @@ export async function startWatcher(deps: WatcherDeps) {
   const arcClients = makeArcClients(deps.arcRpcUrl, deps.arcAccount);
   /** Agents with a live (non-revoked) mandate — the heartbeat loop reads this directly. */
   const liveAgents = new Set<Address>();
+
+  /** Per-agent nonce for `MandateAnchor.syncMandate` — strictly monotonic, per the contract's own
+   *  invariant. Scoped to THIS watcher instance (one per org, one anchor each) rather than a
+   *  module-level map — a shared map keyed by agent alone was a real latent bug once a single
+   *  Enforcer process watches more than one org: nonces are actually per-`(anchor, agent)`, so two
+   *  orgs sharing one map would seed org B's nonce from org A's state and revert every sync with
+   *  `MandateAnchor__NonceNotMonotonic`. Cached after first use, but ALWAYS seeded from this
+   *  anchor's actual on-chain nonce the first time a given agent is synced — a fresh,
+   *  in-memory-only counter would restart at 0 after any Enforcer restart and revert every sync
+   *  thereafter against an agent that already has anchor state. */
+  const nonceByAgent = new Map<Address, bigint>();
+
+  async function nextNonceFor(agent: Address): Promise<bigint> {
+    if (!nonceByAgent.has(agent)) {
+      const anchor = await arcClients.publicClient.readContract({
+        address: deps.anchorAddress,
+        abi: MandateAnchorAbi,
+        functionName: "anchors",
+        args: [agent],
+      });
+      const [, , , , , , updatedAt, currentNonce] = anchor;
+      // updatedAt == 0 means this agent has never been synced — MandateAnchor's own
+      // isFirstSync check accepts any starting nonce in that case, so 0 is a safe start.
+      nonceByAgent.set(agent, updatedAt === 0n ? -1n : currentNonce);
+    }
+    const next = nonceByAgent.get(agent)! + 1n;
+    nonceByAgent.set(agent, next);
+    return next;
+  }
 
   async function syncNode(node: Hex, reason: "issued" | "amended" | "revoked") {
     const mandate = await sepoliaClient.readContract({
@@ -90,7 +73,7 @@ export async function startWatcher(deps: WatcherDeps) {
 
     const agent = mandate.agentWallet;
     const revoked = reason === "revoked" || mandate.revoked;
-    const nonce = await nextNonceFor(agent, arcClients, deps.anchorAddress);
+    const nonce = await nextNonceFor(agent);
 
     const payload: SyncPayload = {
       agent,
@@ -114,8 +97,16 @@ export async function startWatcher(deps: WatcherDeps) {
       liveAgents.add(agent);
     }
 
-    const walletsByAddress = await loadWalletsByAddress(deps.privy);
-    const walletId = walletsByAddress.get(agent.toLowerCase() as Address);
+    let walletsByAddress = await deps.wallets.get();
+    let walletId = walletsByAddress.get(agent.toLowerCase() as Address);
+    if (!walletId) {
+      // The composer provisions a wallet and issues its mandate in the same flow, seconds apart —
+      // easily inside the cache's TTL window. One forced refetch before giving up, rather than
+      // making every sync pay for a cache that's usually still fresh.
+      deps.wallets.invalidate();
+      walletsByAddress = await deps.wallets.get();
+      walletId = walletsByAddress.get(agent.toLowerCase() as Address);
+    }
     if (!walletId) {
       console.warn(`[privy] no Privy server wallet found for ${agent} — skipping policy sync`);
       return;
