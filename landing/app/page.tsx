@@ -17,6 +17,63 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://app.runmandate.xyz";
 
 const BUILT_ON = ["ENSv2", "Arc", "Privy", "ERC-8004", "ERC-8183"];
 
+/** Answer-shaped questions written to real search queries, in the page's own voice — every answer
+ *  restates a fact already established elsewhere on this page, nothing new asserted here. Doubles
+ *  as the FAQPage JSON-LD below, so the two must stay in sync if either changes. */
+const FAQ: Array<{ question: string; answer: string }> = [
+  {
+    question: "What is a spending mandate?",
+    answer:
+      "An ENS subname whose records are an AI agent's entire spending authority — budget, per-transaction cap, allowlisted recipients, and an expiry. The agent can read it. It cannot edit it.",
+  },
+  {
+    question: "How do you revoke an AI agent's spending power?",
+    answer:
+      "One transaction on Sepolia. The Enforcer tears down the agent's Privy policy and flips its Arc anchor — its very next payment is refused, before it signs, and again on-chain if it somehow tried.",
+  },
+  {
+    question: "Can an agent change its own limits?",
+    answer:
+      "No. mandate.* records are principal-writable only. An agent may sub-delegate a strictly narrower mandate to another agent — never a wider one, enforced by the contract's own math — but it can never edit its own.",
+  },
+  {
+    question: "Why ENS instead of a database?",
+    answer:
+      "A database's permissions are private to one app. An ENS subname is a public, portable record any counterparty can resolve and check before accepting a job — the same name that names the agent also carries its authority.",
+  },
+  {
+    question: "What happens if the Enforcer goes offline?",
+    answer:
+      "Every agent freezes, not frees. assertSpend reverts if the Arc anchor hasn't been synced or heartbeat-ed within its staleness window — fail closed, on purpose, unlike most systems that watch a chain and fail open when the watcher dies.",
+  },
+  {
+    question: "Does the agent ever hold private keys?",
+    answer:
+      "No. Its wallet is a Privy-managed signer gated by a conditional policy — the agent never sees a seed phrase, and the pooled treasury on Arc, not the agent's own wallet, holds the funds it draws against.",
+  },
+];
+
+const SOFTWARE_APPLICATION_JSON_LD = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "MANDATE",
+  applicationCategory: "DeveloperApplication",
+  operatingSystem: "Web",
+  description:
+    "ENS subnames are revocable powers of attorney for AI agents. Arc is where they spend.",
+  url: "https://runmandate.xyz",
+};
+
+const FAQ_JSON_LD = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: FAQ.map(({ question, answer }) => ({
+    "@type": "Question",
+    name: question,
+    acceptedAnswer: { "@type": "Answer", text: answer },
+  })),
+};
+
 /** A section heading that rises into view once, on scroll — the product's one recurring gesture. */
 function SectionHeading({
   eyebrow,
@@ -51,6 +108,10 @@ function SectionHeading({
 export default function LandingPage() {
   return (
     <>
+      {/* eslint-disable-next-line react/no-danger -- static, hand-authored JSON, no user input */}
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(SOFTWARE_APPLICATION_JSON_LD) }} />
+      {/* eslint-disable-next-line react/no-danger */}
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(FAQ_JSON_LD) }} />
       <Nav />
       <AnnouncementBar />
       <main>
@@ -329,6 +390,29 @@ export default function LandingPage() {
                       </span>
                     </Card>
                   </Link>
+                </motion.div>
+              ))}
+            </motion.div>
+          </div>
+        </section>
+
+        {/* ------------------------------------------------------------- FAQ */}
+        <section className="py-24 sm:py-28">
+          <div className="mx-auto max-w-3xl px-6">
+            <SectionHeading>Common questions</SectionHeading>
+            <motion.div
+              variants={stagger(0.06)}
+              initial="hidden"
+              whileInView="visible"
+              viewport={VIEWPORT}
+              className="mt-10 divide-y divide-border-subtle border-t border-border-subtle"
+            >
+              {FAQ.map((item) => (
+                <motion.div key={item.question} variants={fadeUp} className="py-6">
+                  <h3 className="font-sans text-[17px] font-semibold tracking-tight text-primary">
+                    {item.question}
+                  </h3>
+                  <p className="mt-2 text-[14px] leading-relaxed text-secondary">{item.answer}</p>
                 </motion.div>
               ))}
             </motion.div>
