@@ -28,6 +28,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         { href: `${base}/mandate/new`, label: "Issue mandate" },
         { href: `${base}/jobs`, label: "Jobs" },
         { href: `${base}/treasury`, label: "Treasury" },
+        { href: `${base}/approvals`, label: "Approvals" },
       ]
     : [{ href: "/", label: "Organisations" }];
 
