@@ -10,6 +10,7 @@ import { BINDING_KEYS } from "@mandate/shared/ensKeys";
 import { useMandateDetail } from "../../lib/useMandateDetail";
 import { usePrivyMandateStatus, type PrivyPolicyRule } from "../../lib/usePrivyMandateStatus";
 import { useIdentityVerification } from "../../lib/useIdentityVerification";
+import { useReputation } from "../../lib/useReputation";
 import type { DeployedAddresses } from "../../lib/addresses";
 
 interface MandateDetailPanelProps {
@@ -127,6 +128,8 @@ export function MandateDetailPanel({ node, state, addresses, onRevoke, revoking 
   const { mandate, agentWallet, mandateRecords, agentRecords, bindingRecords, anchor, account } =
     useMandateDetail(node, addresses);
   const privy = usePrivyMandateStatus(agentWallet);
+  const erc8004IdText = bindingRecords.find((r) => r.key === BINDING_KEYS.erc8004Id)?.value;
+  const reputation = useReputation(erc8004IdText);
 
   const budgetTotal = mandate ? fromErc20Usdc(mandate.terms.budgetTotal) : undefined;
   const spent = account ? fromErc20Usdc(account[0]) : undefined;
@@ -192,6 +195,14 @@ export function MandateDetailPanel({ node, state, addresses, onRevoke, revoking 
             }
           />
         ))}
+        {reputation.status === "available" ? (
+          <RecordRow
+            label="erc8004 reputation"
+            value={`${reputation.averageValue.toFixed(2)} avg · ${reputation.count} feedback`}
+          />
+        ) : reputation.status === "no-feedback" ? (
+          <RecordRow label="erc8004 reputation" value="no feedback yet" />
+        ) : null}
       </Plane>
 
       <RuleLabel>Enforcement · Privy</RuleLabel>

@@ -9,3 +9,4 @@ export { MandateOrgFactoryAbi } from "./MandateOrgFactory";
 export { ArcVaultFactoryAbi } from "./ArcVaultFactory";
 export { MandateRegistrarDeployerAbi } from "./MandateRegistrarDeployer";
 export { IdentityRegistryAbi } from "./IdentityRegistry";
+export { ReputationRegistryAbi } from "./ReputationRegistry";
