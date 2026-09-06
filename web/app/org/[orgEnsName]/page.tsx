@@ -16,6 +16,7 @@ import type { OrgWithVault } from "@mandate/shared/orgs";
 import { useSelectedOrg } from "@/lib/useSelectedOrg";
 import { mandateStateOf, useMandateGraph } from "@/lib/useMandateGraph";
 import { useMandateLabels } from "@/lib/useMandateLabels";
+import { useAdversaryAttempts } from "@/lib/useAdversaryAttempts";
 import { MandateTree } from "@/app/_components/MandateTree";
 import { MandateDetailPanel } from "@/app/_components/MandateDetailPanel";
 import { OrgNotFound } from "@/app/_components/OrgNotFound";
@@ -26,6 +27,40 @@ import { OrgNotFound } from "@/app/_components/OrgNotFound";
  * on-chain), never from a global env constant: two org tabs open side by side must never read
  * each other's registrar.
  */
+/**
+ * The adversary agent's own escape-attempts log, surfaced directly — see
+ * `web/app/api/adversary/attempts/route.ts`'s NatSpec for what this is and isn't. Renders nothing
+ * when the log isn't reachable (a deployment with no adversary process running at all, e.g.
+ * production), rather than a misleading "0 attempts" that could read as "0 vulnerabilities."
+ */
+function AdversaryPanel() {
+  const { data, loading } = useAdversaryAttempts();
+  if (loading || !data?.available || data.total === 0) return null;
+
+  const clean = data.succeeded === 0;
+  return (
+    <motion.div variants={fadeUp} initial="hidden" animate="visible" transition={{ delay: 0.09 }} className="mt-6">
+      <Card padding="lg">
+        <div className="flex items-center justify-between gap-6">
+          <div className="grid grid-cols-3 gap-8">
+            <Stat label="Escape attempts" value={data.total} />
+            <Stat label="Succeeded" value={data.succeeded} />
+            <Stat label="Blocked" value={data.blocked} />
+          </div>
+          <span className={`shrink-0 font-mono text-[11px] uppercase tracking-label ${clean ? "text-live" : "text-revoked"}`}>
+            {clean ? "none succeeded" : "review needed"}
+          </span>
+        </div>
+        <p className="mt-4 text-[12px] leading-relaxed text-tertiary">
+          A red-team agent attacking its own mandate — an exploratory fuzz over paths a human
+          wouldn&rsquo;t think to try, not a formal proof. The Foundry invariant suite is the actual
+          proof; this is a demonstration.
+        </p>
+      </Card>
+    </motion.div>
+  );
+}
+
 function OrgOverview({ org }: { org: OrgWithVault }) {
   const { nodes, loading } = useMandateGraph(org.registrar);
   const labels = useMandateLabels(
@@ -92,6 +127,8 @@ function OrgOverview({ org }: { org: OrgWithVault }) {
           </div>
         </Card>
       </motion.div>
+
+      <AdversaryPanel />
 
       <motion.div
         variants={fadeUp}
