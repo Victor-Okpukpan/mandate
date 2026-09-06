@@ -17,6 +17,7 @@ import { MonoValue } from "@mandate/ui/components/MonoValue";
 import { SkeletonRows } from "@mandate/ui/components/Skeleton";
 import { useSelectedOrg } from "@/lib/useSelectedOrg";
 import { useOptionalPrivy } from "@/lib/usePrivyMandateStatus";
+import { useIsOrgAdmin } from "@/lib/useIsOrgAdmin";
 import { OrgNotFound } from "@/app/_components/OrgNotFound";
 
 const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
@@ -91,6 +92,7 @@ function useRecordPreview(args: {
 function NewMandateForm({ org }: { org: OrgWithVault }) {
   const router = useRouter();
   const privy = useOptionalPrivy();
+  const { isAdmin, owner, isConnected, loading: adminLoading } = useIsOrgAdmin(org.registrar);
 
   const [label, setLabel] = useState("");
   const [agentWallet, setAgentWallet] = useState("");
@@ -193,6 +195,34 @@ function NewMandateForm({ org }: { org: OrgWithVault }) {
       args: [label, agentWallet as Address, terms, arcWallet as Address, allowHumanJson],
       chainId: sepolia.id,
     });
+  }
+
+  // Rendered after every hook above has already run — this only changes what shows, never what
+  // `issueMandate`'s own `onlyOwner` check allows. A non-admin previously saw the full composer
+  // and only found out they couldn't issue anything after signing and sending a transaction that
+  // was always going to revert; this tells them up front, before they've spent any gas.
+  if (!adminLoading && !isAdmin) {
+    return (
+      <div className="mx-auto max-w-2xl px-6 py-16">
+        <Eyebrow>Authority plane · Sepolia</Eyebrow>
+        <Display as="h1" size="sm" className="mt-2">
+          Admin only
+        </Display>
+        <Card padding="lg" className="mt-6">
+          <p className="text-[14px] text-secondary">
+            {isConnected
+              ? "The connected wallet isn't this org's admin — only its registrar owner may issue a mandate."
+              : "Connect this org's admin wallet to issue a mandate."}
+          </p>
+          {owner ? (
+            <p className="mt-3 flex items-center gap-1.5 text-[13px] text-tertiary">
+              admin wallet
+              <MonoValue value={owner} className="text-secondary" />
+            </p>
+          ) : null}
+        </Card>
+      </div>
+    );
   }
 
   return (

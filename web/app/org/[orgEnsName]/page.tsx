@@ -17,6 +17,7 @@ import { useSelectedOrg } from "@/lib/useSelectedOrg";
 import { mandateStateOf, useMandateGraph } from "@/lib/useMandateGraph";
 import { useMandateLabels } from "@/lib/useMandateLabels";
 import { useAdversaryAttempts } from "@/lib/useAdversaryAttempts";
+import { useIsOrgAdmin } from "@/lib/useIsOrgAdmin";
 import { MandateTree } from "@/app/_components/MandateTree";
 import { MandateDetailPanel } from "@/app/_components/MandateDetailPanel";
 import { OrgNotFound } from "@/app/_components/OrgNotFound";
@@ -69,6 +70,7 @@ function OrgOverview({ org }: { org: OrgWithVault }) {
   );
   const { writeContract, isPending } = useWriteContract();
   const { isConnected } = useAccount();
+  const { isAdmin } = useIsOrgAdmin(org.registrar);
   const [selected, setSelected] = useState<Hex | null>(null);
   const [revokingNode, setRevokingNode] = useState<Hex | null>(null);
   const now = Math.floor(Date.now() / 1000);
@@ -171,7 +173,7 @@ function OrgOverview({ org }: { org: OrgWithVault }) {
             node={selectedNode.node}
             state={mandateStateOf(selectedNode, now)}
             addresses={detailAddresses}
-            onRevoke={() => handleRevoke(selectedNode.node)}
+            onRevoke={isAdmin ? () => handleRevoke(selectedNode.node) : undefined}
             revoking={revokingNode === selectedNode.node && isPending}
           />
         ) : null}
