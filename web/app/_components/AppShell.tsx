@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { ThemeToggle } from "@mandate/ui/components/Theme";
 import { LogoMark, Wordmark } from "@mandate/ui/components/Logo";
+import { SITE_URL } from "@mandate/ui/seo";
 import { ConnectButton } from "./ConnectButton";
 
 /**
@@ -90,6 +91,17 @@ export function AppShell({ children }: { children: ReactNode }) {
               Arc testnet · money
             </span>
           </div>
+          {/* The app had zero links back to the marketing site — it received link equity from
+              two landing links and returned none, and a user inside the dashboard had no route
+              to the docs. */}
+          <a
+            href={`${SITE_URL}/docs`}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-1 text-[11px] text-tertiary transition-colors hover:text-primary"
+          >
+            Docs →
+          </a>
         </div>
       </aside>
 
