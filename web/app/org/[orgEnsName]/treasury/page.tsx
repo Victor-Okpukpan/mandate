@@ -1,5 +1,6 @@
 "use client";
 
+import { use } from "react";
 import { useReadContract, useReadContracts } from "wagmi";
 import { arcTestnet } from "viem/chains";
 import type { Address } from "viem";
@@ -10,18 +11,18 @@ import { MonoValue } from "@mandate/ui/components/MonoValue";
 import { Display, Eyebrow, Lede, RuleLabel } from "@mandate/ui/components/Type";
 import { Meter, Stat } from "@mandate/ui/components/Stat";
 import { Table, TableWrap, Td, Th, Tr } from "@mandate/ui/components/Table";
-import { getDeployedAddresses, isDeployed, type DeployedAddresses } from "../../lib/addresses";
-import { useMandateGraph } from "../../lib/useMandateGraph";
-import { NotDeployed } from "../_components/NotDeployed";
+import { SkeletonRows } from "@mandate/ui/components/Skeleton";
+import { useSelectedOrg } from "@/lib/useSelectedOrg";
+import { useMandateGraph } from "@/lib/useMandateGraph";
+import { OrgNotFound } from "@/app/_components/OrgNotFound";
+import { NotDeployed } from "@/app/_components/NotDeployed";
 
 /**
  * Every hook this page needs lives here, called unconditionally — never in the outer
- * `TreasuryPage`, which has an early return before it can know a treasury exists. Calling hooks
- * after a conditional return is a real Rules-of-Hooks violation; it was silently safe only because
- * `isDeployed` used to read build-inlined env constants that never changed between renders. Once
- * org selection is dynamic (a route param instead of a single env var), that branch flips at
- * runtime and React throws "Rendered fewer hooks than expected." Fix it here, once, rather than at
- * the point something dynamic gets bolted on.
+ * `TreasuryPage`, which resolves the org (and may not have a vault yet) before this can mount.
+ * See this file's earlier fix: calling hooks after a conditional return is a real Rules-of-Hooks
+ * violation, silently safe only as long as the branch never flipped at runtime. Org selection is
+ * now a route param, so it does.
  */
 function TreasuryView({ treasury, registrar }: { treasury: Address; registrar: Address }) {
   const { data: totalDeposited } = useReadContract({
@@ -143,16 +144,33 @@ function TreasuryView({ treasury, registrar }: { treasury: Address; registrar: A
   );
 }
 
-export default function TreasuryPage() {
-  const addresses: DeployedAddresses = getDeployedAddresses();
+export default function TreasuryPage({ params }: { params: Promise<{ orgEnsName: string }> }) {
+  const { orgEnsName } = use(params);
+  const { org, loading, notFound } = useSelectedOrg(decodeURIComponent(orgEnsName));
 
-  if (!isDeployed(addresses, ["mandateRegistrar", "agentTreasury"])) {
+  if (loading) {
     return (
-      <div className="mx-auto max-w-xl px-6 py-16">
-        <NotDeployed what="AgentTreasury" />
+      <div className="mx-auto max-w-5xl px-6 py-10 sm:py-14">
+        <SkeletonRows rows={4} />
       </div>
     );
   }
 
-  return <TreasuryView treasury={addresses.agentTreasury!} registrar={addresses.mandateRegistrar!} />;
+  if (notFound || !org) {
+    return (
+      <div className="flex min-h-[calc(100dvh-4rem)] items-center justify-center px-6">
+        <OrgNotFound orgEnsName={decodeURIComponent(orgEnsName)} />
+      </div>
+    );
+  }
+
+  if (!org.vault) {
+    return (
+      <div className="mx-auto max-w-xl px-6 py-16">
+        <NotDeployed what={`${org.orgEnsName}'s Arc vault`} />
+      </div>
+    );
+  }
+
+  return <TreasuryView treasury={org.vault.treasury} registrar={org.registrar} />;
 }

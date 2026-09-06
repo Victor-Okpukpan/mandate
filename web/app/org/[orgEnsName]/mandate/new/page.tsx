@@ -1,21 +1,23 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { use, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useWaitForTransactionReceipt, useWriteContract } from "wagmi";
 import { sepolia } from "viem/chains";
-import { parseUnits, type Address, type Hex } from "viem";
+import { parseUnits, type Address } from "viem";
 import { MandateRegistrarAbi } from "@mandate/shared/abis";
 import { buildAllowlist } from "@mandate/shared/merkle";
 import { MANDATE_KEYS, AGENT_KEYS } from "@mandate/shared/ensKeys";
+import type { OrgWithVault } from "@mandate/shared/orgs";
 import { Button } from "@mandate/ui/components/Button";
 import { Card } from "@mandate/ui/components/Card";
 import { Field, Input, Textarea } from "@mandate/ui/components/Field";
 import { Display, Eyebrow, Lede, RuleLabel } from "@mandate/ui/components/Type";
 import { MonoValue } from "@mandate/ui/components/MonoValue";
-import { getDeployedAddresses, isDeployed } from "../../../lib/addresses";
-import { useOptionalPrivy } from "../../../lib/usePrivyMandateStatus";
-import { NotDeployed } from "../../_components/NotDeployed";
+import { SkeletonRows } from "@mandate/ui/components/Skeleton";
+import { useSelectedOrg } from "@/lib/useSelectedOrg";
+import { useOptionalPrivy } from "@/lib/usePrivyMandateStatus";
+import { OrgNotFound } from "@/app/_components/OrgNotFound";
 
 const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 
@@ -86,8 +88,7 @@ function useRecordPreview(args: {
   }, [args.budgetTotal, args.perTxCap, args.budgetPeriodDays, args.expiryDays, args.maxDepth, args.allowlist]);
 }
 
-export default function NewMandatePage() {
-  const addresses = getDeployedAddresses();
+function NewMandateForm({ org }: { org: OrgWithVault }) {
   const router = useRouter();
   const privy = useOptionalPrivy();
 
@@ -121,14 +122,6 @@ export default function NewMandatePage() {
     hash: txHash,
     chainId: sepolia.id,
   });
-
-  if (!isDeployed(addresses, ["mandateRegistrar"])) {
-    return (
-      <div className="mx-auto max-w-xl px-6 py-16">
-        <NotDeployed what="MandateRegistrar" />
-      </div>
-    );
-  }
 
   /**
    * The step that never existed anywhere in this repo: creating the agent's actual wallet. Calls
@@ -194,7 +187,7 @@ export default function NewMandatePage() {
     };
 
     writeContract({
-      address: addresses.mandateRegistrar!,
+      address: org.registrar,
       abi: MandateRegistrarAbi,
       functionName: "issueMandate",
       args: [label, agentWallet as Address, terms, arcWallet as Address, allowHumanJson],
@@ -209,14 +202,18 @@ export default function NewMandatePage() {
         Issue a mandate
       </Display>
       <Lede className="mt-3">
-        Every field on the left becomes a resolver record on the right — the mandate is nothing
-        more or less than what gets written here.
+        Every field on the left becomes a resolver record on the right, under {org.orgEnsName} —
+        the mandate is nothing more or less than what gets written here.
       </Lede>
 
       <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_380px] lg:items-start">
         <Card padding="lg">
           <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-            <Field label="Label" required hint="The subname, e.g. “research” for research.mandate.eth">
+            <Field
+              label="Label"
+              required
+              hint={`The subname, e.g. “research” for research.${org.orgEnsName}`}
+            >
               <Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="research" required />
             </Field>
 
@@ -347,7 +344,7 @@ export default function NewMandatePage() {
               {confirmed && (
                 <button
                   type="button"
-                  onClick={() => router.push("/")}
+                  onClick={() => router.push(`/org/${org.orgEnsName}`)}
                   className="text-[13px] text-accent hover:underline"
                 >
                   View in the tree →
@@ -396,4 +393,27 @@ export default function NewMandatePage() {
       </div>
     </div>
   );
+}
+
+export default function NewMandatePage({ params }: { params: Promise<{ orgEnsName: string }> }) {
+  const { orgEnsName } = use(params);
+  const { org, loading, notFound } = useSelectedOrg(decodeURIComponent(orgEnsName));
+
+  if (loading) {
+    return (
+      <div className="mx-auto max-w-6xl px-6 py-10 sm:py-14">
+        <SkeletonRows rows={3} />
+      </div>
+    );
+  }
+
+  if (notFound || !org) {
+    return (
+      <div className="flex min-h-[calc(100dvh-4rem)] items-center justify-center px-6">
+        <OrgNotFound orgEnsName={decodeURIComponent(orgEnsName)} />
+      </div>
+    );
+  }
+
+  return <NewMandateForm org={org} />;
 }
