@@ -22,6 +22,9 @@ landing/CLAUDE.md
 web/AGENTS.md
 web/CLAUDE.md
 
+# --- Agents ---
+agents/adversary/escape-attempts.jsonl
+
 # --- Foundry ---
 contracts/cache/
 contracts/out/
