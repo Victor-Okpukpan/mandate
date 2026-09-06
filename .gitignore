@@ -1,6 +1,7 @@
 # --- Planning docs (never tracked) ---
 mandate.md
 SPONSOR-NOTES.md
+HOW-IT-WORKS.md
 
 # --- Node / pnpm ---
 node_modules/
