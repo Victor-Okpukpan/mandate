@@ -1,0 +1,18 @@
+# MANDATE
+
+> ENS subnames are revocable powers of attorney for AI agents. Arc is where they spend. A company issues each of its AI agents an ENS subname whose resolver records are that agent's entire spending authority — budget, per-transaction cap, allowlisted recipients, and an expiry. The agent can read its own limits; it cannot edit them. Revoking the name refuses the agent's very next payment, before it signs, and again on-chain if it somehow tried.
+
+MANDATE is built on three planes: authority (ENSv2 on Sepolia), enforcement (an off-chain service called the Enforcer, which watches Sepolia and compiles each mandate into a Privy conditional wallet policy and a signed Arc anchor — it can only ever narrow permission, never widen it), and money (Arc, where USDC is gas and every spend is checked against the anchor). Agents never hold private keys directly; their wallets are Privy-managed signers gated by policy.
+
+## Docs
+
+- [How MANDATE works](https://runmandate.xyz/docs): The three-plane model end to end, plus how to actually use the dashboard — sign in, provision an agent, issue a mandate, revoke it.
+- [ENS subnames as agent permissions](https://runmandate.xyz/docs/ens): Why a mandate is an ENSv2 subname with specific roles withheld — soulbound (no transfer-admin), self-expiring (no renew), narrowing-only sub-delegation.
+- [Privy wallet policies, and their limits](https://runmandate.xyz/docs/privy): What Privy's conditional policies enforce for an agent's spending, and why their limits (private to one app, ~10 rolling aggregations, post-hoc updates) still need an onchain ledger alongside them.
+- [Arc: USDC-gas payments for agents](https://runmandate.xyz/docs/arc): The org treasury as a revolving USDC credit facility on Arc, and how ERC-8004 identity/reputation and ERC-8183 job escrow compose into it.
+- [Architecture](https://runmandate.xyz/docs/architecture): The authority/enforcement/money split in full, and what changed from the original single-chain design.
+- [Security model and known limitations](https://runmandate.xyz/docs/security): The threat model, the Enforcer's own trust assumptions, and every known limitation disclosed rather than hidden.
+
+## Optional
+
+- [Source (GitHub)](https://github.com/victor-okpukpan/mandate): Full implementation — contracts, Enforcer, dashboard, agent runtimes.
