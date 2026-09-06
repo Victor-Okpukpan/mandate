@@ -38,6 +38,11 @@ export function getSepoliaAddresses() {
     verifiableFactory: requireAddress("SEPOLIA_VERIFIABLE_FACTORY"),
     rentPriceOracle: requireAddress("SEPOLIA_RENT_PRICE_ORACLE"),
     mockUsdc: requireAddress("SEPOLIA_MOCK_USDC"),
+    mandateOrgFactory: optionalAddress("SEPOLIA_MANDATE_ORG_FACTORY"),
+    /** Single-org fallback — the registrar one run of the factory flow (or the old
+     *  now-deleted DeploySepolia.s.sol) produced. Multi-org callers should read
+     *  `mandateOrgFactory`'s own `OrgCreated` events via `listOrgs` instead; this stays for
+     *  local dev and `SeedDemo.s.sol` so nothing breaks before that plumbing lands everywhere. */
     mandateRegistrar: optionalAddress("SEPOLIA_MANDATE_REGISTRAR"),
   } as const;
 }
@@ -50,6 +55,10 @@ export function getArcAddresses() {
     erc8004Reputation: requireAddress("ARC_ERC8004_REPUTATION"),
     erc8004Validation: requireAddress("ARC_ERC8004_VALIDATION"),
     erc8183Jobs: requireAddress("ARC_ERC8183_JOBS"),
+    arcVaultFactory: optionalAddress("ARC_VAULT_FACTORY"),
+    /** Single-org fallback — see the matching comment on `getSepoliaAddresses`'s
+     *  `mandateRegistrar`. Multi-org callers should read `arcVaultFactory`'s own `VaultCreated`
+     *  events via `listVaults` instead. */
     mandateAnchor: optionalAddress("ARC_MANDATE_ANCHOR"),
     agentTreasury: optionalAddress("ARC_AGENT_TREASURY"),
   } as const;

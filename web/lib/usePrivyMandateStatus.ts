@@ -28,7 +28,7 @@ const PRIVY_CONFIGURED = Boolean(process.env.NEXT_PUBLIC_PRIVY_APP_ID);
 /** Small wrapper so a caller in a tree with no `PrivyProvider` mounted (Privy not configured at
  *  all) doesn't crash calling `usePrivy()` directly — mirrors the same guard `ConnectButton`
  *  already uses for the same reason. */
-function useOptionalPrivy() {
+export function useOptionalPrivy() {
   // eslint-disable-next-line react-hooks/rules-of-hooks -- PRIVY_CONFIGURED is a build-time
   // constant (NEXT_PUBLIC_*), so this condition never changes between renders.
   return PRIVY_CONFIGURED ? usePrivy() : null;

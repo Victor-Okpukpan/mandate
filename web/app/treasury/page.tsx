@@ -2,6 +2,7 @@
 
 import { useReadContract, useReadContracts } from "wagmi";
 import { arcTestnet } from "viem/chains";
+import type { Address } from "viem";
 import { AgentTreasuryAbi } from "@mandate/shared/abis";
 import { fromErc20Usdc } from "@mandate/shared/decimals";
 import { Card } from "@mandate/ui/components/Card";
@@ -9,22 +10,20 @@ import { MonoValue } from "@mandate/ui/components/MonoValue";
 import { Display, Eyebrow, Lede, RuleLabel } from "@mandate/ui/components/Type";
 import { Meter, Stat } from "@mandate/ui/components/Stat";
 import { Table, TableWrap, Td, Th, Tr } from "@mandate/ui/components/Table";
-import { getDeployedAddresses, isDeployed } from "../../lib/addresses";
+import { getDeployedAddresses, isDeployed, type DeployedAddresses } from "../../lib/addresses";
 import { useMandateGraph } from "../../lib/useMandateGraph";
 import { NotDeployed } from "../_components/NotDeployed";
 
-export default function TreasuryPage() {
-  const addresses = getDeployedAddresses();
-
-  if (!isDeployed(addresses, ["mandateRegistrar", "agentTreasury"])) {
-    return (
-      <div className="mx-auto max-w-xl px-6 py-16">
-        <NotDeployed what="AgentTreasury" />
-      </div>
-    );
-  }
-
-  const treasury = addresses.agentTreasury!;
+/**
+ * Every hook this page needs lives here, called unconditionally — never in the outer
+ * `TreasuryPage`, which has an early return before it can know a treasury exists. Calling hooks
+ * after a conditional return is a real Rules-of-Hooks violation; it was silently safe only because
+ * `isDeployed` used to read build-inlined env constants that never changed between renders. Once
+ * org selection is dynamic (a route param instead of a single env var), that branch flips at
+ * runtime and React throws "Rendered fewer hooks than expected." Fix it here, once, rather than at
+ * the point something dynamic gets bolted on.
+ */
+function TreasuryView({ treasury, registrar }: { treasury: Address; registrar: Address }) {
   const { data: totalDeposited } = useReadContract({
     address: treasury,
     abi: AgentTreasuryAbi,
@@ -35,6 +34,12 @@ export default function TreasuryPage() {
     address: treasury,
     abi: AgentTreasuryAbi,
     functionName: "totalDrawn",
+    chainId: arcTestnet.id,
+  });
+  const { data: totalWithdrawn } = useReadContract({
+    address: treasury,
+    abi: AgentTreasuryAbi,
+    functionName: "totalWithdrawn",
     chainId: arcTestnet.id,
   });
   const { data: utilisationCapBps } = useReadContract({
@@ -50,7 +55,7 @@ export default function TreasuryPage() {
     chainId: arcTestnet.id,
   });
 
-  const { nodes: mandateNodes } = useMandateGraph(addresses.mandateRegistrar);
+  const { nodes: mandateNodes } = useMandateGraph(registrar);
   const agents = Array.from(new Set(mandateNodes.map((n) => n.agentWallet)));
 
   const { data: accounts } = useReadContracts({
@@ -64,8 +69,12 @@ export default function TreasuryPage() {
     query: { enabled: agents.length > 0 },
   });
 
+  // v2's cap base is (totalDeposited - totalWithdrawn), not totalDeposited alone — liquidity the
+  // org already withdrew is no longer backing anything. Mirrored here so this tile never disagrees
+  // with what the contract itself will actually enforce on the next spend.
+  const liquidBase = (totalDeposited ?? 0n) - (totalWithdrawn ?? 0n);
   const utilisationFraction =
-    totalDeposited && totalDeposited > 0n ? Number((totalDrawn ?? 0n) * 10_000n / totalDeposited) / 10_000 : 0;
+    liquidBase > 0n ? Number(((totalDrawn ?? 0n) * 10_000n) / liquidBase) / 10_000 : 0;
 
   return (
     <div className="mx-auto max-w-5xl px-6 py-10 sm:py-14">
@@ -132,4 +141,18 @@ export default function TreasuryPage() {
       </div>
     </div>
   );
+}
+
+export default function TreasuryPage() {
+  const addresses: DeployedAddresses = getDeployedAddresses();
+
+  if (!isDeployed(addresses, ["mandateRegistrar", "agentTreasury"])) {
+    return (
+      <div className="mx-auto max-w-xl px-6 py-16">
+        <NotDeployed what="AgentTreasury" />
+      </div>
+    );
+  }
+
+  return <TreasuryView treasury={addresses.agentTreasury!} registrar={addresses.mandateRegistrar!} />;
 }

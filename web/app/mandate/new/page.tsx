@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { usePrivy } from "@privy-io/react-auth";
 import { useWaitForTransactionReceipt, useWriteContract } from "wagmi";
 import { sepolia } from "viem/chains";
 import { parseUnits, type Address, type Hex } from "viem";
@@ -15,10 +14,10 @@ import { Field, Input, Textarea } from "@mandate/ui/components/Field";
 import { Display, Eyebrow, Lede, RuleLabel } from "@mandate/ui/components/Type";
 import { MonoValue } from "@mandate/ui/components/MonoValue";
 import { getDeployedAddresses, isDeployed } from "../../../lib/addresses";
+import { useOptionalPrivy } from "../../../lib/usePrivyMandateStatus";
 import { NotDeployed } from "../../_components/NotDeployed";
 
 const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
-const PRIVY_CONFIGURED = Boolean(process.env.NEXT_PUBLIC_PRIVY_APP_ID);
 
 interface RecordPreviewRow {
   key: string;
@@ -90,7 +89,7 @@ function useRecordPreview(args: {
 export default function NewMandatePage() {
   const addresses = getDeployedAddresses();
   const router = useRouter();
-  const privy = PRIVY_CONFIGURED ? usePrivy() : null;
+  const privy = useOptionalPrivy();
 
   const [label, setLabel] = useState("");
   const [agentWallet, setAgentWallet] = useState("");

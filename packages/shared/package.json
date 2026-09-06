@@ -15,6 +15,7 @@
     "./ensKeys": "./src/ensKeys.ts",
     "./roles": "./src/roles.ts",
     "./allowHuman": "./src/allowHuman.ts",
+    "./orgs": "./src/orgs.ts",
     "./merkle": "./src/merkle.ts",
     "./abis": "./src/abis/index.ts"
   },

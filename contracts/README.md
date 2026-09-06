@@ -34,7 +34,7 @@ contract's public interface:
 forge build
 python3 - <<'EOF'
 import json
-for name in ["MandateRegistrar", "MandateAnchor", "AgentTreasury"]:
+for name in ["MandateRegistrar", "MandateAnchor", "AgentTreasury", "MandateOrgFactory", "ArcVaultFactory", "MandateRegistrarDeployer"]:
     with open(f"out/{name}.sol/{name}.json") as f:
         abi = json.load(f)["abi"]
     with open(f"../packages/shared/src/abis/{name}.ts", "w") as f:
