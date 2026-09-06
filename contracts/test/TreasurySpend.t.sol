@@ -359,11 +359,70 @@ contract TreasurySpendTest is Test {
     function test_FundJob_ApprovesAndFundsThroughJobsContract() public {
         _syncAgent(_singleLeafRoot(address(jobs)), 4, false);
 
-        vm.prank(agent);
-        treasury.fundJob(1, 10_000_000, _emptyProof());
+        vm.startPrank(agent);
+        uint256 jobId = treasury.createJob(makeAddr("provider"), makeAddr("evaluator"), block.timestamp + 1 days, "test job", address(0));
+        jobs.setProviderForTest(jobId, makeAddr("provider"));
+        treasury.fundJob(jobId, 10_000_000, _emptyProof());
+        vm.stopPrank();
 
-        assertEq(jobs.funded(1), 10_000_000);
+        MockJobs.Job memory job = jobs.getJob(jobId);
+        assertEq(job.budget, 10_000_000);
         assertEq(usdc.balanceOf(address(jobs)), 10_000_000);
+    }
+
+    /// @notice The bug the real verified `AgenticCommerce` source exposed: `fund` requires
+    ///         `msg.sender == job.client`, and `JOBS.fund` is called AS this contract, so funding
+    ///         a job this contract never created (client is someone/something else) must revert
+    ///         rather than silently no-op or misattribute spend.
+    function test_FundJob_RevertsIfCallerDidNotCreateTheJob() public {
+        _syncAgent(_singleLeafRoot(address(jobs)), 4, false);
+
+        address other = makeAddr("other-agent");
+        vm.prank(other);
+        uint256 jobId = treasury.createJob(makeAddr("provider"), makeAddr("evaluator"), block.timestamp + 1 days, "test job", address(0));
+
+        vm.prank(agent);
+        vm.expectRevert(abi.encodeWithSelector(AgentTreasury.AgentTreasury__NotJobOwner.selector, jobId, agent));
+        treasury.fundJob(jobId, 10_000_000, _emptyProof());
+    }
+
+    function test_CreateJob_MakesTreasuryTheJobsContractClient() public {
+        vm.prank(agent);
+        uint256 jobId = treasury.createJob(makeAddr("provider"), makeAddr("evaluator"), block.timestamp + 1 days, "test job", address(0));
+
+        assertEq(treasury.jobAgent(jobId), agent);
+        assertEq(jobs.getJob(jobId).client, address(treasury));
+    }
+
+    function test_ReclaimJobRefund_CreditsAgentPrincipalFromExpiredJob() public {
+        _syncAgent(_singleLeafRoot(address(jobs)), 4, false);
+
+        vm.startPrank(agent);
+        uint256 jobId = treasury.createJob(makeAddr("provider"), makeAddr("evaluator"), block.timestamp + 1 days, "test job", address(0));
+        jobs.setProviderForTest(jobId, makeAddr("provider"));
+        treasury.fundJob(jobId, 10_000_000, _emptyProof());
+        vm.stopPrank();
+
+        uint128 principalBefore = _principalOf(agent);
+        assertGe(principalBefore, 10_000_000);
+
+        vm.warp(block.timestamp + 2 days);
+        uint256 interestAccrued = treasury.accrue(agent); // capitalized into principal by
+            // `_settleInterest` inside `_applyRefund`, before the refund is subtracted — account
+            // for it rather than asserting an exact pre-interest figure.
+        treasury.reclaimJobRefund(jobId); // permissionless, matching the real claimRefund
+
+        assertEq(_principalOf(agent), principalBefore + interestAccrued - 10_000_000);
+        assertEq(treasury.spentNow(agent), 0); // 2 days > the 1-day budget period: fully decayed
+    }
+
+    function test_ReclaimJobRefund_RevertsForUnknownJob() public {
+        vm.expectRevert(abi.encodeWithSelector(AgentTreasury.AgentTreasury__UnknownJob.selector, 999));
+        treasury.reclaimJobRefund(999);
+    }
+
+    function _principalOf(address a) internal view returns (uint128 principal) {
+        (, principal,,) = treasury.accounts(a); // (spentAccum, principal, lastSpendAt, lastAccrualAt)
     }
 
     /*//////////////////////////////////////////////////////////////

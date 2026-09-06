@@ -41,9 +41,18 @@ import { MandateAnchor } from "contracts/MandateAnchor.sol";
 ///
 ///      v2 closes a third hole, found rather than spec'd: there was no way for the org to ever
 ///      get its own deposited USDC back out, and no way to reconcile funds an ERC-8183 job
-///      returns via `claimRefund` (a real function on the deployed Jobs contract, per
-///      SPONSOR-NOTES §1.5 — signature unconfirmed, see `callJobs`). See `withdraw` and
-///      `reconcileRefund` below; both preserve INV-1 and the restated INV-9.
+///      returns via `claimRefund`. See `withdraw` and `reconcileRefund` below; both preserve
+///      INV-1 and the restated INV-9.
+///
+///      v3 fixes a fourth hole, this one only visible against `AgenticCommerce`'s real verified
+///      source (pulled from Arcscan, not guessed): `fund` requires `msg.sender == job.client`, so
+///      a job created by the agent's own wallet could never actually be funded by this contract —
+///      `fundJob` would revert `Unauthorized()` on every real job, always. `createJob` below
+///      makes this contract the client on every job it creates, closing that gap; `jobAgent`
+///      remembers which agent it was for, since the real contract has no such record itself.
+///      `claimRefund` is also confirmed permissionless in the same source — `reclaimJobRefund`
+///      wires it straight through instead of leaving it to a manual `callJobs` + `reconcileRefund`
+///      two-step.
 contract AgentTreasury is Ownable2Step, ReentrancyGuardTransient {
     using SafeERC20 for IERC20;
     using SafeCast for uint256;
@@ -100,6 +109,12 @@ contract AgentTreasury is Ownable2Step, ReentrancyGuardTransient {
 
     mapping(address agent => AgentAccount) public accounts;
 
+    /// @notice Which agent created a given ERC-8183 job through `createJob`. Necessary because
+    ///         every job this contract creates has `job.client == address(this)` on the real Jobs
+    ///         contract (see `createJob`'s NatSpec) — the real contract has no other record of
+    ///         which internal agent it belongs to. Zero for a jobId this contract never created.
+    mapping(uint256 jobId => address agent) public jobAgent;
+
     /*//////////////////////////////////////////////////////////////
                                   EVENTS
     //////////////////////////////////////////////////////////////*/
@@ -115,6 +130,9 @@ contract AgentTreasury is Ownable2Step, ReentrancyGuardTransient {
     event Withdrawn(address indexed to, uint256 amount);
     event RefundReconcilerUpdated(address indexed reconciler);
     event RefundReconciled(address indexed agent, uint256 indexed jobId, uint256 applied, uint256 surplus);
+    event JobCreated(
+        address indexed agent, uint256 indexed jobId, address indexed provider, address evaluator
+    );
 
     /*//////////////////////////////////////////////////////////////
                                   ERRORS
@@ -129,6 +147,8 @@ contract AgentTreasury is Ownable2Step, ReentrancyGuardTransient {
     error AgentTreasury__InsufficientLiquidity(uint256 requested, uint256 available);
     error AgentTreasury__NotReconciler(address caller);
     error AgentTreasury__RefundExceedsSurplus(uint256 requested, uint256 available);
+    error AgentTreasury__NotJobOwner(uint256 jobId, address caller);
+    error AgentTreasury__UnknownJob(uint256 jobId);
 
     /*//////////////////////////////////////////////////////////////
                               INITIALIZATION
@@ -238,14 +258,17 @@ contract AgentTreasury is Ownable2Step, ReentrancyGuardTransient {
         emit Withdrawn(to, amount);
     }
 
-    /// @notice Reconcile USDC that landed back in this contract from a returned escrow (e.g. an
-    ///         ERC-8183 `claimRefund`) against `agent`'s outstanding principal.
-    /// @dev Deliberately reconciles a BALANCE DELTA rather than calling any external refund
-    ///      function directly — `claimRefund`'s real signature and caller-authorization model are
-    ///      unconfirmed (SPONSOR-NOTES §1.5 records only that the function exists). This design
-    ///      lets a refund be reconciled by whatever actually triggers it (this contract's own
-    ///      `callJobs`, a future typed call once the signature is confirmed, or even a manual
-    ///      transfer) without ever needing another redeploy.
+    /// @notice Reconcile USDC that landed back in this contract from a returned escrow — e.g. an
+    ///         evaluator's `reject` refund, or a manual transfer — against `agent`'s outstanding
+    ///         principal. For the specific, now-confirmed-permissionless `claimRefund` case, use
+    ///         `reclaimJobRefund` instead: it calls `claimRefund` and this same accounting in one
+    ///         transaction rather than requiring `refundReconciler` to watch for the balance
+    ///         change and follow up.
+    /// @dev Deliberately reconciles a BALANCE DELTA rather than assuming any particular external
+    ///      call produced it — `reject` and `claimRefund` both just pay `job.client` (this
+    ///      contract) with no callback, so there's nothing else to hook. This design lets a refund
+    ///      be reconciled from whatever actually triggers it (this contract's own `callJobs`, or a
+    ///      manual transfer) without ever needing another redeploy.
     ///
     ///      The `unaccounted` guard is the load-bearing security property here: even a fully
     ///      compromised `refundReconciler` cannot forgive principal that no USDC actually came
@@ -265,31 +288,55 @@ contract AgentTreasury is Ownable2Step, ReentrancyGuardTransient {
         uint256 unaccounted = USDC.balanceOf(address(this)) - accountedLiquid;
         if (amount > unaccounted) revert AgentTreasury__RefundExceedsSurplus(amount, unaccounted);
 
-        _settleInterest(agent);
-        AgentAccount storage acct = accounts[agent];
-
-        uint256 applied = amount > acct.principal ? acct.principal : amount;
-        acct.principal -= applied.toUint128();
-        totalDrawn -= applied;
-
-        uint256 surplus = amount - applied;
-        if (surplus > 0) totalDeposited += surplus;
-
-        (, uint32 budgetPeriod) = ANCHOR.budgetOf(agent);
-        uint128 decayed = _decayedSpent(acct, budgetPeriod);
-        acct.spentAccum = decayed > applied ? decayed - applied.toUint128() : 0;
-
-        emit RefundReconciled(agent, jobId, applied, surplus);
+        _applyRefund(agent, jobId, amount);
     }
 
-    /// @notice Owner-gated escape hatch to call the immutable `JOBS` contract directly — e.g. to
-    ///         trigger `claimRefund` once its real signature is confirmed on Arc.
+    /// @notice Claim an expired, unresolved job's refund and reconcile it against the agent that
+    ///         created it, in one call. `JOBS.claimRefund` is confirmed permissionless in the real
+    ///         deployed source (no caller check at all) and pays `job.budget` to `job.client`,
+    ///         which is always this contract for a job created via `createJob` — so the balance
+    ///         delta this produces is exactly, and only, that job's refund. This supersedes the
+    ///         manual `callJobs` + `reconcileRefund` two-step for the one case now confirmed safe
+    ///         to wire in directly; `callJobs` remains for anything else (e.g. `reject`).
+    function reclaimJobRefund(uint256 jobId) external nonReentrant {
+        address agent = jobAgent[jobId];
+        if (agent == address(0)) revert AgentTreasury__UnknownJob(jobId);
+
+        uint256 before = USDC.balanceOf(address(this));
+        JOBS.claimRefund(jobId);
+        uint256 amount = USDC.balanceOf(address(this)) - before;
+        if (amount == 0) return;
+
+        _applyRefund(agent, jobId, amount);
+    }
+
+    /// @notice Owner-gated escape hatch to call the immutable `JOBS` contract directly — e.g.
+    ///         `reject` on a job this contract's counterparty needs cancelled. Follow with
+    ///         `reconcileRefund` to credit whatever balance delta this produces.
     /// @dev Hard-restricted to `JOBS`, never a caller-supplied target: this is not, and must never
     ///      become, the generic `(target, data)` executor the contract-level NatSpec's
-    ///      simplification #1 already rejected for `payTo`/`fundJob`. Follow with
-    ///      `reconcileRefund` to credit whatever balance delta this produces.
+    ///      simplification #1 already rejected for `payTo`/`fundJob`.
     function callJobs(bytes calldata data) external onlyOwner nonReentrant returns (bytes memory) {
         return Address.functionCall(address(JOBS), data);
+    }
+
+    /// @notice Create an ERC-8183 job with THIS contract as `job.client` — not the calling agent.
+    /// @dev Necessary, not stylistic: the real `AgenticCommerce.fund` requires
+    ///      `msg.sender == job.client`, and `fundJob` below calls `JOBS.fund` as this contract, so
+    ///      unless this contract is also the one that created the job, every `fundJob` call would
+    ///      revert `Unauthorized()`. Found by reading the verified deployed source, not spec'd —
+    ///      see the contract-level NatSpec and `IERC8183Jobs`'s own NatSpec for the full chain of
+    ///      reasoning. Costs no USDC and isn't budget-checked; `fundJob` is where spend is gated.
+    function createJob(
+        address provider,
+        address evaluator,
+        uint256 expiredAt,
+        string calldata description,
+        address hook
+    ) external nonReentrant returns (uint256 jobId) {
+        jobId = JOBS.createJob(provider, evaluator, expiredAt, description, hook);
+        jobAgent[jobId] = msg.sender;
+        emit JobCreated(msg.sender, jobId, provider, evaluator);
     }
 
     function setRefundReconciler(address reconciler) external onlyOwner {
@@ -319,6 +366,7 @@ contract AgentTreasury is Ownable2Step, ReentrancyGuardTransient {
         external
         nonReentrant
     {
+        if (jobAgent[jobId] != msg.sender) revert AgentTreasury__NotJobOwner(jobId, msg.sender);
         _spend(address(JOBS), amount, proof);
         USDC.forceApprove(address(JOBS), amount);
         JOBS.fund(jobId, "");
@@ -400,6 +448,29 @@ contract AgentTreasury is Ownable2Step, ReentrancyGuardTransient {
 
         acct.spentAccum = newTotal.toUint128();
         acct.lastSpendAt = uint64(block.timestamp);
+    }
+
+    /// @dev Shared by `reconcileRefund` and `reclaimJobRefund`: credits `amount` against `agent`'s
+    ///      outstanding principal, books any surplus as org liquidity, and lowers `spentAccum` by
+    ///      the same amount actually applied — see `reconcileRefund`'s NatSpec for why each of
+    ///      those is correct. Callers are responsible for bounding `amount` to real, unaccounted
+    ///      USDC before calling this — it performs no balance check of its own.
+    function _applyRefund(address agent, uint256 jobId, uint256 amount) internal {
+        _settleInterest(agent);
+        AgentAccount storage acct = accounts[agent];
+
+        uint256 applied = amount > acct.principal ? acct.principal : amount;
+        acct.principal -= applied.toUint128();
+        totalDrawn -= applied;
+
+        uint256 surplus = amount - applied;
+        if (surplus > 0) totalDeposited += surplus;
+
+        (, uint32 budgetPeriod) = ANCHOR.budgetOf(agent);
+        uint128 decayed = _decayedSpent(acct, budgetPeriod);
+        acct.spentAccum = decayed > applied ? decayed - applied.toUint128() : 0;
+
+        emit RefundReconciled(agent, jobId, applied, surplus);
     }
 
     /// @dev Capitalizes any interest accrued since the last settlement into `principal`, owed to
