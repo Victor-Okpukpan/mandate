@@ -13,6 +13,7 @@ export default async function Image() {
       <OgCard
         title="Every agent mandate, live."
         subtitle="Budget, status, and enforcement — read from Sepolia, Privy, and Arc."
+        cta="Sign in →"
       />
     ),
     { ...size, fonts },

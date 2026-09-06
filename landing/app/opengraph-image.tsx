@@ -13,6 +13,7 @@ export default async function Image() {
       <OgCard
         title="Revocable powers of attorney for AI agents."
         subtitle="ENS subnames are the permission. Arc is where they spend."
+        cta="Launch app →"
       />
     ),
     { ...size, fonts },

@@ -33,7 +33,17 @@ export async function loadOgFonts() {
  * access to `packages/ui/src/components/Logo.tsx`'s CSS-var-driven SVG, so the mark is
  * re-expressed here in literal brand colors) rather than introducing a second, drifting design.
  */
-export function OgCard({ title, subtitle }: { title: string; subtitle: string }) {
+export interface OgCardProps {
+  title: string;
+  subtitle: string;
+  /** A short, action-oriented label rendered as a filled pill — "Launch app →", "Read the docs
+   *  →". Scanners like opengraph.xyz flag an OG image with no call-to-action text baked into the
+   *  pixels themselves (a meta description doesn't count); this is what answers that, and doubles
+   *  as a real visual anchor in the bottom-right corner rather than empty space. */
+  cta?: string;
+}
+
+export function OgCard({ title, subtitle, cta = "runmandate.xyz" }: OgCardProps) {
   return (
     <div
       style={{
@@ -95,6 +105,20 @@ export function OgCard({ title, subtitle }: { title: string; subtitle: string })
         <span style={{ fontFamily: "DM Sans", fontWeight: 400, fontSize: 26, color: BRAND.textSecondary }}>
           {subtitle}
         </span>
+      </div>
+
+      <div style={{ display: "flex" }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            padding: "12px 26px",
+            borderRadius: 10,
+            backgroundColor: BRAND.accent,
+          }}
+        >
+          <span style={{ fontFamily: "DM Sans", fontWeight: 700, fontSize: 22, color: BRAND.bg }}>{cta}</span>
+        </div>
       </div>
     </div>
   );

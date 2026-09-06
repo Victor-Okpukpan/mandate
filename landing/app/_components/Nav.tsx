@@ -19,7 +19,7 @@ export function Nav() {
           </Link>
           <Link
             href="/docs"
-            className="hidden text-[14px] text-secondary transition-colors hover:text-primary sm:block"
+            className="hidden text-[14px] font-medium text-primary transition-colors hover:text-accent sm:block"
           >
             Docs
           </Link>

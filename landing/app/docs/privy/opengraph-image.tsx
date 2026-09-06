@@ -9,7 +9,7 @@ export const runtime = "nodejs";
 export default async function Image() {
   const fonts = await loadOgFonts();
   return new ImageResponse(
-    <OgCard title="Privy policies, and their limits" subtitle="runmandate.xyz/docs/privy" />,
+    <OgCard title="Privy policies, and their limits" subtitle="runmandate.xyz/docs/privy" cta="Read the docs →" />,
     { ...size, fonts },
   );
 }
