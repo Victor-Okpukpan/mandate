@@ -112,7 +112,14 @@ function OrgOverview({ org }: { org: OrgWithVault }) {
               </p>
             </div>
           ) : (
-            <MandateTree nodes={nodes} labels={labels} selectedNode={selected ?? undefined} onSelect={setSelected} />
+            <MandateTree
+              nodes={nodes}
+              labels={labels}
+              selectedNode={selected ?? undefined}
+              onSelect={setSelected}
+              orgEnsName={org.orgEnsName}
+              registrar={org.registrar}
+            />
           )}
         </Card>
       </motion.div>
