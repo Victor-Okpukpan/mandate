@@ -55,33 +55,35 @@ is always explicitly marked as such where used.
 cast wallet import mandate-deployer --interactive   # once, per machine
 ```
 
-Three scripts, run in this order:
+Onboarding an org is now a wizard, not a script — see HOW-IT-WORKS.md §4. `MandateOrgFactory`
+deploys a fresh, independently-owned `MandateRegistrar` per org and registers its 2LD for real
+USDC, quoted live from `ETHRegistrar.getRegisterPrice` and pulled via `safeTransferFrom` — nothing
+here ever mints a token. What's left to deploy manually is the **platform itself**, once, by
+whoever operates this site:
 
-1. **`DeploySepolia.s.sol`** — deploys `MandateRegistrar` against the real ENSv2 Sepolia beta, then
-   registers the org's `ORG_ENS_LABEL` as a fresh 2LD via `ETHRegistrar`'s MockUSDC commit-reveal
-   flow (a real wall-clock `vm.sleep` past `MIN_COMMITMENT_AGE`, not `vm.warp` — this broadcasts
-   real transactions), wiring the registrar's own `ORG_ROOT_REGISTRY` as that name's subregistry in
-   the same `register()` call.
+1. **`DeployFactories.s.sol` — `runSepolia()`** — deploys `MandateRegistrarDeployer` (a
+   bytecode-size split `MandateOrgFactory` needs; see its NatSpec) and `MandateOrgFactory` against
+   the real ENSv2 Sepolia beta.
    ```bash
-   forge script script/DeploySepolia.s.sol --account mandate-deployer --sender <address> \
-     --rpc-url $SEPOLIA_RPC_URL --broadcast
+   forge script script/DeployFactories.s.sol --sig "runSepolia()" --account mandate-deployer \
+     --sender <address> --rpc-url $SEPOLIA_RPC_URL --broadcast
    ```
-   Copy the logged `MandateRegistrar` address into `SEPOLIA_MANDATE_REGISTRAR` and
-   `NEXT_PUBLIC_MANDATE_REGISTRAR`.
-2. **`DeployArc.s.sol`** — deploys `MandateAnchor` and `AgentTreasury` on Arc testnet 5042002,
-   wired against the sponsor's own USDC and ERC-8183 Jobs contracts. Independent of step 1; doesn't
-   touch Sepolia.
+   Copy the logged `MandateOrgFactory` address into `SEPOLIA_MANDATE_ORG_FACTORY` and
+   `NEXT_PUBLIC_MANDATE_ORG_FACTORY`.
+2. **`DeployFactories.s.sol` — `runArc()`** — deploys `ArcVaultFactory` on Arc testnet 5042002,
+   wired against the sponsor's own USDC and ERC-8183 Jobs contracts. Independent of step 1.
    ```bash
-   forge script script/DeployArc.s.sol --account mandate-deployer --sender <address> \
-     --rpc-url $ARC_RPC_URL --broadcast
+   forge script script/DeployFactories.s.sol --sig "runArc()" --account mandate-deployer \
+     --sender <address> --rpc-url $ARC_RPC_URL --broadcast
    ```
-   Copy the logged addresses into `ARC_MANDATE_ANCHOR`/`ARC_AGENT_TREASURY` and their
-   `NEXT_PUBLIC_` counterparts.
-3. **`SeedDemo.s.sol`** — issues the two demo mandates ("research", "ops") against the now-deployed
-   `SEPOLIA_MANDATE_REGISTRAR`. Deliberately does not sign or submit anything to Arc: mirroring a
-   mandate onto `MandateAnchor` is the Enforcer's job (run `enforcer/` next), not a one-shot
-   script's — a seed script holding the Enforcer's key, even temporarily, is exactly the kind of
-   plaintext-key exception these conventions exist to prevent.
+   Copy the logged `ArcVaultFactory` address into `ARC_VAULT_FACTORY` and its `NEXT_PUBLIC_`
+   counterpart.
+
+From here, every org — including a demo org — onboards through the wizard: connect a wallet,
+pick a name, sign. `SeedDemo.s.sol` still issues the two demo mandates ("research", "ops") against
+whatever `SEPOLIA_MANDATE_REGISTRAR` that flow produced; it deliberately does not sign or submit
+anything to Arc, since mirroring a mandate onto `MandateAnchor` is the Enforcer's job, not a
+one-shot script's.
    ```bash
    forge script script/SeedDemo.s.sol --account mandate-deployer --sender <address> \
      --rpc-url $SEPOLIA_RPC_URL --broadcast

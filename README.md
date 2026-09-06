@@ -86,7 +86,9 @@ in this environment) — Etherscan mirrors Sourcify's full-match verifications f
 including Sepolia, so its own page should pick this up; the Sourcify link is the authoritative
 source in the meantime.
 
-Org root: `mandate.eth`, registered on ENSv2 Sepolia via `DeploySepolia.s.sol`.
+Org root: `mandate.eth`, registered on ENSv2 Sepolia via `MandateOrgFactory` — every org, including
+this one, onboards through the same self-serve flow now (`contracts/script/DeployFactories.s.sol`
+deploys the platform factories once; see `contracts/README.md`).
 
 ## Design decisions that diverge from the original spec
 

@@ -9,6 +9,7 @@ import {
     ReentrancyGuardTransient
 } from "openzeppelin-contracts/utils/ReentrancyGuardTransient.sol";
 import { SafeCast } from "openzeppelin-contracts/utils/math/SafeCast.sol";
+import { Address } from "openzeppelin-contracts/utils/Address.sol";
 
 import { IERC8183Jobs } from "contracts/interfaces/IERC8183Jobs.sol";
 import { MandateAnchor } from "contracts/MandateAnchor.sol";
@@ -37,6 +38,12 @@ import { MandateAnchor } from "contracts/MandateAnchor.sol";
 ///         `period == 0` (the spec's own "lifetime budget" case). `_consumeBudget` decays the
 ///         accumulated spend linearly instead: no boundary to straddle, and `period == 0` decays
 ///         nothing at all — exactly the lifetime cap the spec wanted, without the crash.
+///
+///      v2 closes a third hole, found rather than spec'd: there was no way for the org to ever
+///      get its own deposited USDC back out, and no way to reconcile funds an ERC-8183 job
+///      returns via `claimRefund` (a real function on the deployed Jobs contract, per
+///      SPONSOR-NOTES §1.5 — signature unconfirmed, see `callJobs`). See `withdraw` and
+///      `reconcileRefund` below; both preserve INV-1 and the restated INV-9.
 contract AgentTreasury is Ownable2Step, ReentrancyGuardTransient {
     using SafeERC20 for IERC20;
     using SafeCast for uint256;
@@ -80,6 +87,16 @@ contract AgentTreasury is Ownable2Step, ReentrancyGuardTransient {
 
     uint256 public totalDeposited;
     uint256 public totalDrawn;
+    /// @dev Liquidity the org has pulled back out via `withdraw`. Tracked separately rather than
+    ///      decremented from `totalDeposited` because `totalDeposited` is also the utilisation-cap
+    ///      base (`_checkUtilisationCap`) — conflating the two would let the cap silently widen
+    ///      back out after a withdrawal instead of shrinking with the liquidity that actually left.
+    uint256 public totalWithdrawn;
+
+    /// @notice Address permitted to call `reconcileRefund` in addition to the owner — e.g. an
+    ///         automation key that watches for ERC-8183 `claimRefund` proceeds landing here.
+    ///         Zero address means only the owner may reconcile.
+    address public refundReconciler;
 
     mapping(address agent => AgentAccount) public accounts;
 
@@ -95,6 +112,9 @@ contract AgentTreasury is Ownable2Step, ReentrancyGuardTransient {
     event UtilisationCapUpdated(uint16 bps);
     event InterestRateUpdated(uint16 bps);
     event MaxGasFloatUpdated(uint128 amount);
+    event Withdrawn(address indexed to, uint256 amount);
+    event RefundReconcilerUpdated(address indexed reconciler);
+    event RefundReconciled(address indexed agent, uint256 indexed jobId, uint256 applied, uint256 surplus);
 
     /*//////////////////////////////////////////////////////////////
                                   ERRORS
@@ -106,6 +126,9 @@ contract AgentTreasury is Ownable2Step, ReentrancyGuardTransient {
     error AgentTreasury__UtilisationCapExceeded(uint256 wouldBeDrawn, uint256 cap);
     error AgentTreasury__BudgetExceeded(uint256 wouldBeSpent, uint128 budgetTotal);
     error AgentTreasury__InvalidBps(uint16 bps);
+    error AgentTreasury__InsufficientLiquidity(uint256 requested, uint256 available);
+    error AgentTreasury__NotReconciler(address caller);
+    error AgentTreasury__RefundExceedsSurplus(uint256 requested, uint256 available);
 
     /*//////////////////////////////////////////////////////////////
                               INITIALIZATION
@@ -184,6 +207,7 @@ contract AgentTreasury is Ownable2Step, ReentrancyGuardTransient {
     function repay(uint256 amount) external nonReentrant {
         if (amount == 0) revert AgentTreasury__ZeroAmount();
 
+        uint256 interestSettled = accrue(msg.sender);
         _settleInterest(msg.sender);
         AgentAccount storage acct = accounts[msg.sender];
 
@@ -192,7 +216,85 @@ contract AgentTreasury is Ownable2Step, ReentrancyGuardTransient {
         totalDrawn -= applied;
 
         USDC.safeTransferFrom(msg.sender, address(this), applied);
-        emit Repaid(msg.sender, applied, 0);
+        emit Repaid(msg.sender, applied, interestSettled);
+    }
+
+    /// @notice Withdraw the org's own deposited liquidity. Owner-gated: this pulls actual USDC out
+    ///         of the pool, unlike every setter above it.
+    /// @dev Before v2 there was no way to do this at all — deposited USDC was permanently locked
+    ///      in the contract, recoverable only via `draw`/`payTo`/`fundJob` moving it back out
+    ///      through an agent. That is a worse gap than the missing escrow-refund path this same
+    ///      version adds. Bounded by actual on-chain liquidity, not by `totalDeposited` alone —
+    ///      liquidity already lent out via `draw`/`payTo`/`fundJob` is by definition not sitting
+    ///      here to withdraw.
+    function withdraw(address to, uint256 amount) external nonReentrant onlyOwner {
+        if (to == address(0)) revert AgentTreasury__ZeroAddress();
+        if (amount == 0) revert AgentTreasury__ZeroAmount();
+        uint256 liquid = USDC.balanceOf(address(this));
+        if (amount > liquid) revert AgentTreasury__InsufficientLiquidity(amount, liquid);
+
+        totalWithdrawn += amount;
+        USDC.safeTransfer(to, amount);
+        emit Withdrawn(to, amount);
+    }
+
+    /// @notice Reconcile USDC that landed back in this contract from a returned escrow (e.g. an
+    ///         ERC-8183 `claimRefund`) against `agent`'s outstanding principal.
+    /// @dev Deliberately reconciles a BALANCE DELTA rather than calling any external refund
+    ///      function directly — `claimRefund`'s real signature and caller-authorization model are
+    ///      unconfirmed (SPONSOR-NOTES §1.5 records only that the function exists). This design
+    ///      lets a refund be reconciled by whatever actually triggers it (this contract's own
+    ///      `callJobs`, a future typed call once the signature is confirmed, or even a manual
+    ///      transfer) without ever needing another redeploy.
+    ///
+    ///      The `unaccounted` guard is the load-bearing security property here: even a fully
+    ///      compromised `refundReconciler` cannot forgive principal that no USDC actually came
+    ///      back for, because `amount` is capped by real, otherwise-unexplained balance sitting in
+    ///      this contract right now. Its worst case is misattributing a genuine refund to the
+    ///      wrong agent — it can never manufacture funds that were never deposited.
+    ///
+    ///      Crediting `spentAccum` back down is correct, not merely convenient: the mandate did
+    ///      not, in the end, spend what came back, so `spentNow(agent) <= budgetTotal` (INV-1) can
+    ///      only be strengthened by this, never broken.
+    function reconcileRefund(address agent, uint256 jobId, uint256 amount) external nonReentrant {
+        if (msg.sender != refundReconciler && msg.sender != owner()) {
+            revert AgentTreasury__NotReconciler(msg.sender);
+        }
+
+        uint256 accountedLiquid = totalDeposited - totalWithdrawn - totalDrawn;
+        uint256 unaccounted = USDC.balanceOf(address(this)) - accountedLiquid;
+        if (amount > unaccounted) revert AgentTreasury__RefundExceedsSurplus(amount, unaccounted);
+
+        _settleInterest(agent);
+        AgentAccount storage acct = accounts[agent];
+
+        uint256 applied = amount > acct.principal ? acct.principal : amount;
+        acct.principal -= applied.toUint128();
+        totalDrawn -= applied;
+
+        uint256 surplus = amount - applied;
+        if (surplus > 0) totalDeposited += surplus;
+
+        (, uint32 budgetPeriod) = ANCHOR.budgetOf(agent);
+        uint128 decayed = _decayedSpent(acct, budgetPeriod);
+        acct.spentAccum = decayed > applied ? decayed - applied.toUint128() : 0;
+
+        emit RefundReconciled(agent, jobId, applied, surplus);
+    }
+
+    /// @notice Owner-gated escape hatch to call the immutable `JOBS` contract directly — e.g. to
+    ///         trigger `claimRefund` once its real signature is confirmed on Arc.
+    /// @dev Hard-restricted to `JOBS`, never a caller-supplied target: this is not, and must never
+    ///      become, the generic `(target, data)` executor the contract-level NatSpec's
+    ///      simplification #1 already rejected for `payTo`/`fundJob`. Follow with
+    ///      `reconcileRefund` to credit whatever balance delta this produces.
+    function callJobs(bytes calldata data) external onlyOwner nonReentrant returns (bytes memory) {
+        return Address.functionCall(address(JOBS), data);
+    }
+
+    function setRefundReconciler(address reconciler) external onlyOwner {
+        refundReconciler = reconciler;
+        emit RefundReconcilerUpdated(reconciler);
     }
 
     /// @notice Pay `to` directly from the pool. The core spend path: checked against
@@ -316,8 +418,12 @@ contract AgentTreasury is Ownable2Step, ReentrancyGuardTransient {
         acct.lastAccrualAt = uint64(block.timestamp);
     }
 
+    /// @dev Base is `totalDeposited - totalWithdrawn`, not `totalDeposited` alone — liquidity the
+    ///      owner has already `withdraw`n is no longer backing anything and must shrink the cap
+    ///      with it, or an agent could keep drawing against a phantom ceiling after the org pulled
+    ///      its own funds back out.
     function _checkUtilisationCap(uint256 amount) internal view {
-        uint256 cap = (totalDeposited * utilisationCapBps) / BPS_DENOMINATOR;
+        uint256 cap = ((totalDeposited - totalWithdrawn) * utilisationCapBps) / BPS_DENOMINATOR;
         uint256 wouldBeDrawn = totalDrawn + amount;
         if (wouldBeDrawn > cap) revert AgentTreasury__UtilisationCapExceeded(wouldBeDrawn, cap);
     }
