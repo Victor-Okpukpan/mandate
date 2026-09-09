@@ -99,9 +99,16 @@ export async function startOrgSupervisor(deps: SupervisorDeps) {
     }
   }
 
-  if (!orgFactory || !vaultFactory) {
-    console.log("[supervisor] no factories configured — running the single-org fallback");
+  // The single-org fallback and the factories are NOT mutually exclusive: the fallback predates
+  // the factories and its org (e.g. the original mandate.eth) was never, and will never be,
+  // created through either one — a factory backfill can't discover it by definition. Deploying the
+  // factories must not silently stop watching whatever was already live before that happened, so
+  // this always attempts the fallback first, regardless of whether factories are also configured.
+  // `running` is keyed by registrar address, so if the fallback org is ever ALSO returned by a
+  // factory backfill (shouldn't happen, but not load-bearing to assume), `startOrg` dedupes it.
+  try {
     const fallback = loadSingleOrgFallback();
+    console.log(`[supervisor] single-org fallback configured (${fallback.mandateRegistrar}) — watching it too`);
     await startOrg({
       registrar: fallback.mandateRegistrar,
       orgRootRegistry: fallback.mandateRegistrar,
@@ -118,6 +125,12 @@ export async function startOrgSupervisor(deps: SupervisorDeps) {
         createdAtBlock: 0n,
       },
     });
+  } catch {
+    console.log("[supervisor] no single-org fallback configured");
+  }
+
+  if (!orgFactory || !vaultFactory) {
+    console.log("[supervisor] no factories configured — running the single-org fallback only");
     return {
       stop: () => {
         for (const r of running.values()) {
