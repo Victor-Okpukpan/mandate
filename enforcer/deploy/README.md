@@ -45,6 +45,17 @@ Not the full 58-var list — just what `enforcer/src/config.ts` actually reads:
   - `ENFORCER_DEV_PRIVATE_KEY_ANVIL_ONLY` (plaintext — Anvil/local only, never point this at a
     real key on a real network)
 - `PRIVY_APP_ID`, `PRIVY_APP_SECRET`
+- **The full ENSv2 + Arc sponsor address set** — `loadFactories()`/`loadSingleOrgFallback()` both
+  call `getSepoliaAddresses()`/`getArcAddresses()` (`packages/shared/src/addresses.ts`), which
+  `requireAddress()` every one of these, not just the org-specific ones below. All public, verified
+  sponsor addresses (not secrets) — copy them straight from `.env.example`'s Sepolia/Arc sections:
+  `SEPOLIA_ROOT_REGISTRY`, `SEPOLIA_ETH_REGISTRY`, `SEPOLIA_ETH_REGISTRAR`,
+  `SEPOLIA_USER_REGISTRY_IMPL`, `SEPOLIA_PERMISSIONED_RESOLVER_IMPL`,
+  `SEPOLIA_UNIVERSAL_RESOLVER_V2`, `SEPOLIA_VERIFIABLE_FACTORY`, `SEPOLIA_RENT_PRICE_ORACLE`,
+  `SEPOLIA_MOCK_USDC`, `ARC_USDC`, `ARC_ERC8004_IDENTITY`, `ARC_ERC8004_REPUTATION`,
+  `ARC_ERC8004_VALIDATION`, `ARC_ERC8183_JOBS`. Easiest to just copy the whole `.env.example` and
+  fill in the org/secret-specific lines below, rather than hand-picking a subset — this list was
+  hand-picked once already and missed these.
 - Either the single-org fallback (`SEPOLIA_MANDATE_REGISTRAR`, `ARC_MANDATE_ANCHOR`,
   `ARC_AGENT_TREASURY`) or, once deployed, the two factory addresses
   (`SEPOLIA_MANDATE_ORG_FACTORY`, `ARC_VAULT_FACTORY`) — `enforcer/src/config.ts`'s
