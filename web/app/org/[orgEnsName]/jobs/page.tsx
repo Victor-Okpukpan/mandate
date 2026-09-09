@@ -30,8 +30,8 @@ const STATUS_COLOR: Record<number, string> = {
  * shape hadn't been independently confirmed; it now has, against the real verified source on
  * Arcscan (see `contracts/src/interfaces/IERC8183Jobs.sol`).
  */
-function JobsView({ treasury }: { treasury: Address }) {
-  const { rows, loading } = useJobsFeed(treasury);
+function JobsView({ treasury, vaultCreatedAtBlock }: { treasury: Address; vaultCreatedAtBlock: bigint }) {
+  const { rows, loading } = useJobsFeed(treasury, vaultCreatedAtBlock);
 
   const openCount = rows.filter((r) => r.status === 0).length;
   const activeCount = rows.filter((r) => r.status === 1 || r.status === 2).length;
@@ -146,5 +146,5 @@ export default function JobsPage({ params }: { params: Promise<{ orgEnsName: str
     );
   }
 
-  return <JobsView treasury={org.vault.treasury} />;
+  return <JobsView treasury={org.vault.treasury} vaultCreatedAtBlock={org.vault.createdAtBlock} />;
 }

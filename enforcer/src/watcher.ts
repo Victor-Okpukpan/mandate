@@ -4,6 +4,7 @@ import { PrivyClient } from "@privy-io/node";
 import { MandateAnchorAbi, MandateRegistrarAbi, PermissionedResolverAbi } from "@mandate/shared/abis";
 import { MANDATE_KEYS } from "@mandate/shared/ensKeys";
 import { parseAllowHuman } from "@mandate/shared/allowHuman";
+import { getContractEventsChunked } from "@mandate/shared/eventLogs";
 import { revokePolicyForWallet, syncPolicyForWallet } from "./privyPolicy.js";
 import { makeArcClients, submitSync, type SyncPayload } from "./arcSync.js";
 import type { WalletCache } from "./walletCache.js";
@@ -12,6 +13,12 @@ import type { PrivateKeyAccount } from "viem/accounts";
 export interface WatcherDeps {
   sepoliaRpcUrl: string;
   registrarAddress: Address;
+  /** The block `registrarAddress` was created at — `MandateOrgFactory.OrgCreated`'s own
+   *  `createdAtBlock` for this org. Backfilling from `"earliest"` (Sepolia genesis) instead is not
+   *  merely wasteful, it's already broken: `eth_getLogs` is range-capped (see
+   *  `@mandate/shared/eventLogs`'s own NatSpec), and Sepolia is deep enough now that
+   *  genesis-to-latest exceeds that cap on the very first call for a brand-new org. */
+  registrarFromBlock: bigint;
   anchorAddress: Address;
   agentTreasuryAddress: Address;
   privy: PrivyClient;
@@ -155,26 +162,23 @@ export async function startWatcher(deps: WatcherDeps) {
 
   // Backfill: catch up on everything the registrar has ever emitted before subscribing live.
   const [issuedLogs, amendedLogs, revokedLogs] = await Promise.all([
-    sepoliaClient.getContractEvents({
+    getContractEventsChunked(sepoliaClient, {
       address: deps.registrarAddress,
       abi: MandateRegistrarAbi,
       eventName: "MandateIssued",
-      fromBlock: "earliest",
-      toBlock: "latest",
+      fromBlock: deps.registrarFromBlock,
     }),
-    sepoliaClient.getContractEvents({
+    getContractEventsChunked(sepoliaClient, {
       address: deps.registrarAddress,
       abi: MandateRegistrarAbi,
       eventName: "MandateAmended",
-      fromBlock: "earliest",
-      toBlock: "latest",
+      fromBlock: deps.registrarFromBlock,
     }),
-    sepoliaClient.getContractEvents({
+    getContractEventsChunked(sepoliaClient, {
       address: deps.registrarAddress,
       abi: MandateRegistrarAbi,
       eventName: "MandateRevoked",
-      fromBlock: "earliest",
-      toBlock: "latest",
+      fromBlock: deps.registrarFromBlock,
     }),
   ]);
 

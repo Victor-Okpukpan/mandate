@@ -43,7 +43,7 @@ export default function AgentDetailPage({
 }
 
 function AgentDetailInner({ node, org }: { node: Hex; org: OrgWithVault }) {
-  const { nodes } = useMandateGraph(org.registrar);
+  const { nodes } = useMandateGraph(org.registrar, org.createdAtBlock);
   const now = Math.floor(Date.now() / 1000);
   const match = nodes.find((n) => n.node === node);
   const state = match ? mandateStateOf(match, now) : "stale";

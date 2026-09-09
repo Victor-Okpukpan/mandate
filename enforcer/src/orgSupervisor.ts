@@ -83,6 +83,7 @@ export async function startOrgSupervisor(deps: SupervisorDeps) {
     const watcherDeps: WatcherDeps = {
       sepoliaRpcUrl: rpc.sepolia,
       registrarAddress: org.registrar,
+      registrarFromBlock: org.createdAtBlock,
       anchorAddress: org.vault.anchor,
       agentTreasuryAddress: org.vault.treasury,
       privy: deps.privy,

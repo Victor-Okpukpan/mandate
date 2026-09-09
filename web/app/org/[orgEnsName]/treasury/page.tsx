@@ -24,7 +24,15 @@ import { NotDeployed } from "@/app/_components/NotDeployed";
  * violation, silently safe only as long as the branch never flipped at runtime. Org selection is
  * now a route param, so it does.
  */
-function TreasuryView({ treasury, registrar }: { treasury: Address; registrar: Address }) {
+function TreasuryView({
+  treasury,
+  registrar,
+  registrarFromBlock,
+}: {
+  treasury: Address;
+  registrar: Address;
+  registrarFromBlock: bigint;
+}) {
   const { data: totalDeposited } = useReadContract({
     address: treasury,
     abi: AgentTreasuryAbi,
@@ -56,7 +64,7 @@ function TreasuryView({ treasury, registrar }: { treasury: Address; registrar: A
     chainId: arcTestnet.id,
   });
 
-  const { nodes: mandateNodes } = useMandateGraph(registrar);
+  const { nodes: mandateNodes } = useMandateGraph(registrar, registrarFromBlock);
   const agents = Array.from(new Set(mandateNodes.map((n) => n.agentWallet)));
 
   const { data: accounts } = useReadContracts({
@@ -189,5 +197,11 @@ export default function TreasuryPage({ params }: { params: Promise<{ orgEnsName:
     );
   }
 
-  return <TreasuryView treasury={org.vault.treasury} registrar={org.registrar} />;
+  return (
+    <TreasuryView
+      treasury={org.vault.treasury}
+      registrar={org.registrar}
+      registrarFromBlock={org.createdAtBlock}
+    />
+  );
 }

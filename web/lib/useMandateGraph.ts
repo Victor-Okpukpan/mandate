@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { usePublicClient, useWatchContractEvent } from "wagmi";
 import { sepolia } from "viem/chains";
 import { MandateRegistrarAbi } from "@mandate/shared/abis";
+import { getContractEventsChunked } from "@mandate/shared/eventLogs";
 import type { Address, Hex } from "viem";
 
 export type MandateState = "live" | "expiring" | "revoked" | "stale";
@@ -22,10 +23,14 @@ const ROOT_PARENT = ("0x" + "0".repeat(64)) as Hex;
 const EXPIRING_WINDOW_SECONDS = 24 * 60 * 60; // within 24h of expiry reads as "expiring"
 
 /**
- * The registrar can't have emitted anything before its own deployment, and public RPCs (e.g.
- * publicnode.com: 50,000 blocks) cap how far back a single `eth_getLogs` call may span — so the
- * backfill starts here instead of at `"earliest"`, which would eventually error outright as the
- * gap between genesis and "latest" grows past that cap.
+ * Fallback starting point when a caller doesn't know the registrar's own creation block — the
+ * single-org env var, for the pre-factory registrar. Callers that DO know it (every org read from
+ * `useOrgs()` carries its own `createdAtBlock`) should pass that instead via `fromBlock` — it's
+ * both a tighter bound and, unlike this fixed env var, correct for a registrar created after this
+ * value. Either way the real fix against the range cap is `getContractEventsChunked` below, not
+ * the starting point alone — see that function's own NatSpec: a fixed starting point still
+ * eventually exceeds a public RPC's per-call `eth_getLogs` range cap as "latest" grows; only
+ * chunking makes this never fail regardless of how far back it has to reach.
  */
 const REGISTRAR_DEPLOY_BLOCK = process.env.NEXT_PUBLIC_MANDATE_REGISTRAR_DEPLOY_BLOCK
   ? BigInt(process.env.NEXT_PUBLIC_MANDATE_REGISTRAR_DEPLOY_BLOCK)
@@ -42,10 +47,11 @@ const REGISTRAR_DEPLOY_BLOCK = process.env.NEXT_PUBLIC_MANDATE_REGISTRAR_DEPLOY_
  * per agent wallet. This hook reports live/expiring/revoked from Sepolia only; the page composes
  * the Arc-side staleness check on top.
  */
-export function useMandateGraph(registrarAddress: Address | undefined) {
+export function useMandateGraph(registrarAddress: Address | undefined, fromBlock?: bigint) {
   const [nodes, setNodes] = useState<Map<Hex, MandateNode>>(new Map());
   const [loading, setLoading] = useState(true);
   const publicClient = usePublicClient({ chainId: sepolia.id });
+  const backfillFrom = fromBlock ?? REGISTRAR_DEPLOY_BLOCK;
 
   useEffect(() => {
     if (!registrarAddress || !publicClient) {
@@ -57,26 +63,23 @@ export function useMandateGraph(registrarAddress: Address | undefined) {
     async function backfill() {
       setLoading(true);
       const [issuedLogs, amendedLogs, revokedLogs] = await Promise.all([
-        publicClient!.getContractEvents({
-          address: registrarAddress,
+        getContractEventsChunked(publicClient!, {
+          address: registrarAddress!,
           abi: MandateRegistrarAbi,
           eventName: "MandateIssued",
-          fromBlock: REGISTRAR_DEPLOY_BLOCK,
-          toBlock: "latest",
+          fromBlock: backfillFrom,
         }),
-        publicClient!.getContractEvents({
-          address: registrarAddress,
+        getContractEventsChunked(publicClient!, {
+          address: registrarAddress!,
           abi: MandateRegistrarAbi,
           eventName: "MandateAmended",
-          fromBlock: REGISTRAR_DEPLOY_BLOCK,
-          toBlock: "latest",
+          fromBlock: backfillFrom,
         }),
-        publicClient!.getContractEvents({
-          address: registrarAddress,
+        getContractEventsChunked(publicClient!, {
+          address: registrarAddress!,
           abi: MandateRegistrarAbi,
           eventName: "MandateRevoked",
-          fromBlock: REGISTRAR_DEPLOY_BLOCK,
-          toBlock: "latest",
+          fromBlock: backfillFrom,
         }),
       ]);
 
@@ -122,7 +125,7 @@ export function useMandateGraph(registrarAddress: Address | undefined) {
     return () => {
       cancelled = true;
     };
-  }, [registrarAddress, publicClient]);
+  }, [registrarAddress, publicClient, backfillFrom]);
 
   useWatchContractEvent({
     address: registrarAddress,

@@ -10,6 +10,7 @@
  */
 import type { Address, Hex, PublicClient } from "viem";
 import { MandateOrgFactoryAbi, ArcVaultFactoryAbi } from "./abis";
+import { getContractEventsChunked } from "./eventLogs";
 
 export interface Org {
   registrar: Address;
@@ -39,12 +40,11 @@ export async function listOrgs(
   factory: Address,
   fromBlock: bigint | "earliest" = "earliest",
 ): Promise<Org[]> {
-  const logs = await client.getContractEvents({
+  const logs = await getContractEventsChunked(client, {
     address: factory,
     abi: MandateOrgFactoryAbi,
     eventName: "OrgCreated",
     fromBlock,
-    toBlock: "latest",
   });
 
   return logs
@@ -65,12 +65,11 @@ export async function listVaults(
   factory: Address,
   fromBlock: bigint | "earliest" = "earliest",
 ): Promise<Vault[]> {
-  const logs = await client.getContractEvents({
+  const logs = await getContractEventsChunked(client, {
     address: factory,
     abi: ArcVaultFactoryAbi,
     eventName: "VaultCreated",
     fromBlock,
-    toBlock: "latest",
   });
 
   return logs

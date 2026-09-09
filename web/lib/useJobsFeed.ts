@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { usePublicClient, useReadContract, useReadContracts, useWatchContractEvent } from "wagmi";
 import { arcTestnet } from "viem/chains";
 import { AgentTreasuryAbi, JobsAbi } from "@mandate/shared/abis";
+import { getContractEventsChunked } from "@mandate/shared/eventLogs";
 import type { Address } from "viem";
 
 export interface JobRow {
@@ -28,7 +29,7 @@ export const JOB_STATUS_LABEL = ["Open", "Funded", "Submitted", "Completed", "Re
  * the real deployed Jobs contract itself, polled — the shared contract doesn't get a dedicated
  * per-org event subscription here, since its own status-changing events aren't addressable by org.
  */
-export function useJobsFeed(treasury: Address | undefined) {
+export function useJobsFeed(treasury: Address | undefined, fromBlock: bigint | "earliest" = "earliest") {
   const [jobIds, setJobIds] = useState<{ jobId: bigint; agent: Address }[]>([]);
   const [loading, setLoading] = useState(true);
   const publicClient = usePublicClient({ chainId: arcTestnet.id });
@@ -50,16 +51,11 @@ export function useJobsFeed(treasury: Address | undefined) {
 
     async function backfill() {
       setLoading(true);
-      // "earliest" is fine today — every `AgentTreasury` is freshly deployed and Arc testnet is
-      // young — but will eventually hit the same per-call block-range cap `useMandateGraph.ts`
-      // documents. Fix the same way once it matters: start from the org's own `VaultCreated` log
-      // block instead of genesis.
-      const logs = await publicClient!.getContractEvents({
-        address: treasury,
+      const logs = await getContractEventsChunked(publicClient!, {
+        address: treasury!,
         abi: AgentTreasuryAbi,
         eventName: "JobCreated",
-        fromBlock: "earliest",
-        toBlock: "latest",
+        fromBlock,
       });
       if (cancelled) return;
       setJobIds(
@@ -74,7 +70,7 @@ export function useJobsFeed(treasury: Address | undefined) {
     return () => {
       cancelled = true;
     };
-  }, [treasury, publicClient]);
+  }, [treasury, publicClient, fromBlock]);
 
   useWatchContractEvent({
     address: treasury,

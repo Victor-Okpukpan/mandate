@@ -16,6 +16,7 @@
     "./roles": "./src/roles.ts",
     "./allowHuman": "./src/allowHuman.ts",
     "./orgs": "./src/orgs.ts",
+    "./eventLogs": "./src/eventLogs.ts",
     "./merkle": "./src/merkle.ts",
     "./abis": "./src/abis/index.ts"
   },

@@ -63,7 +63,7 @@ function AdversaryPanel() {
 }
 
 function OrgOverview({ org }: { org: OrgWithVault }) {
-  const { nodes, loading } = useMandateGraph(org.registrar);
+  const { nodes, loading } = useMandateGraph(org.registrar, org.createdAtBlock);
   const labels = useMandateLabels(
     useMemo(() => nodes.map((n) => n.node), [nodes]),
     org.registrar,
