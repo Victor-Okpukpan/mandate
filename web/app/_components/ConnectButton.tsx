@@ -1,25 +1,17 @@
 "use client";
 
 import { usePrivy } from "@privy-io/react-auth";
+import { WalletMenu } from "./WalletMenu";
 
 function ConnectButtonInner() {
-  const { ready, authenticated, login, logout, user } = usePrivy();
+  const { ready, authenticated, login } = usePrivy();
 
   if (!ready) {
     return <div className="h-8 w-24 animate-pulse-live rounded-md bg-surface-3" />;
   }
 
   if (authenticated) {
-    const label = user?.email?.address ?? user?.wallet?.address?.slice(0, 10) ?? "connected";
-    return (
-      <button
-        onClick={() => logout()}
-        className="inline-flex h-8 items-center gap-2 rounded-md border border-border px-3 text-[13px] text-secondary transition-colors hover:border-border-strong hover:text-primary"
-      >
-        <span className="h-1.5 w-1.5 rounded-full bg-live" aria-hidden />
-        {label}
-      </button>
-    );
+    return <WalletMenu />;
   }
 
   return (
