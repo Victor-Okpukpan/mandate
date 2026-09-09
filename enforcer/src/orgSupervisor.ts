@@ -4,7 +4,7 @@ import type { PrivyClient } from "@privy-io/node";
 import type { PrivateKeyAccount } from "viem/accounts";
 import { ArcVaultFactoryAbi, MandateAnchorAbi, MandateOrgFactoryAbi, MandateRegistrarAbi } from "@mandate/shared/abis";
 import { listOrgs, listVaults, joinOrgVaults, type OrgWithVault } from "@mandate/shared/orgs";
-import { loadFactories, loadSingleOrgFallback, MAX_STALENESS_SECONDS } from "./config.js";
+import { loadFactories, MAX_STALENESS_SECONDS } from "./config.js";
 import { startWatcher, type WatcherDeps } from "./watcher.js";
 import { startHeartbeatLoop } from "./heartbeat.js";
 import { createWalletCache } from "./walletCache.js";
@@ -18,14 +18,21 @@ export interface SupervisorDeps {
 }
 
 /**
- * Turns "one Enforcer watches one hard-coded org" into "one Enforcer watches every org the
- * platform's factories have ever created" — HOW-IT-WORKS.md §4's "`OrgCreated` makes the Enforcer
- * self-serve. It watches the factory rather than a hard-coded address, so a new org is picked up
- * automatically with no redeploy." Falls back to the single-org env vars when no factory is
- * configured, so this still runs unmodified on a pre-factory deployment.
+ * "One Enforcer watches every org the platform's factories have ever created" —
+ * HOW-IT-WORKS.md §4's "`OrgCreated` makes the Enforcer self-serve. It watches the factory rather
+ * than a hard-coded address, so a new org is picked up automatically with no redeploy." No
+ * hard-coded org, no env-var fallback org — an org exists to this process only if
+ * `MandateOrgFactory`/`ArcVaultFactory` say it does. Requires both factories to be configured;
+ * throws otherwise rather than silently watching nothing.
  */
 export async function startOrgSupervisor(deps: SupervisorDeps) {
   const { orgFactory, vaultFactory, orgFactoryFromBlock, vaultFactoryFromBlock, rpc } = loadFactories();
+  if (!orgFactory || !vaultFactory) {
+    throw new Error(
+      "SEPOLIA_MANDATE_ORG_FACTORY and ARC_VAULT_FACTORY must both be set — this Enforcer only " +
+        "watches factory-discovered orgs, there is no single-org fallback.",
+    );
+  }
   const wallets = createWalletCache(deps.privy);
   const running = new Map<string, { stopWatcher: () => void; stopHeartbeat: () => void }>();
 
@@ -97,48 +104,6 @@ export async function startOrgSupervisor(deps: SupervisorDeps) {
     } catch (err) {
       console.error(`[supervisor] failed to start watcher for ${org.orgEnsName}:`, err);
     }
-  }
-
-  // The single-org fallback and the factories are NOT mutually exclusive: the fallback predates
-  // the factories and its org (e.g. the original mandate.eth) was never, and will never be,
-  // created through either one — a factory backfill can't discover it by definition. Deploying the
-  // factories must not silently stop watching whatever was already live before that happened, so
-  // this always attempts the fallback first, regardless of whether factories are also configured.
-  // `running` is keyed by registrar address, so if the fallback org is ever ALSO returned by a
-  // factory backfill (shouldn't happen, but not load-bearing to assume), `startOrg` dedupes it.
-  try {
-    const fallback = loadSingleOrgFallback();
-    console.log(`[supervisor] single-org fallback configured (${fallback.mandateRegistrar}) — watching it too`);
-    await startOrg({
-      registrar: fallback.mandateRegistrar,
-      orgRootRegistry: fallback.mandateRegistrar,
-      admin: fallback.mandateRegistrar, // unused by startOrg beyond logging; not load-bearing
-      orgRootNode: `0x${"0".repeat(64)}`,
-      orgEnsName: "mandate.eth",
-      createdAtBlock: 0n,
-      vault: {
-        anchor: fallback.mandateAnchor,
-        treasury: fallback.agentTreasury,
-        admin: fallback.mandateRegistrar,
-        enforcer: deps.arcAccount.address,
-        orgRootNode: `0x${"0".repeat(64)}`,
-        createdAtBlock: 0n,
-      },
-    });
-  } catch {
-    console.log("[supervisor] no single-org fallback configured");
-  }
-
-  if (!orgFactory || !vaultFactory) {
-    console.log("[supervisor] no factories configured — running the single-org fallback only");
-    return {
-      stop: () => {
-        for (const r of running.values()) {
-          r.stopWatcher();
-          r.stopHeartbeat();
-        }
-      },
-    };
   }
 
   const sepoliaClient = createPublicClient({ chain: sepolia, transport: http(rpc.sepolia) });
