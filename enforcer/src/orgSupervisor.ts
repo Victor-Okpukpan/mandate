@@ -25,7 +25,7 @@ export interface SupervisorDeps {
  * configured, so this still runs unmodified on a pre-factory deployment.
  */
 export async function startOrgSupervisor(deps: SupervisorDeps) {
-  const { orgFactory, vaultFactory, rpc } = loadFactories();
+  const { orgFactory, vaultFactory, orgFactoryFromBlock, vaultFactoryFromBlock, rpc } = loadFactories();
   const wallets = createWalletCache(deps.privy);
   const running = new Map<string, { stopWatcher: () => void; stopHeartbeat: () => void }>();
 
@@ -133,8 +133,8 @@ export async function startOrgSupervisor(deps: SupervisorDeps) {
 
   console.log(`[supervisor] backfilling orgs from ${orgFactory} and vaults from ${vaultFactory}`);
   const [orgs, vaults] = await Promise.all([
-    listOrgs(sepoliaClient, orgFactory),
-    listVaults(arcClient, vaultFactory),
+    listOrgs(sepoliaClient, orgFactory, orgFactoryFromBlock),
+    listVaults(arcClient, vaultFactory, vaultFactoryFromBlock),
   ]);
   const joined = joinOrgVaults(orgs, vaults);
   console.log(`[supervisor] found ${orgs.length} org(s), ${vaults.length} vault(s), ${joined.filter((o) => o.vault).length} joined`);

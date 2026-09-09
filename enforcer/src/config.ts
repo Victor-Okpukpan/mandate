@@ -97,12 +97,27 @@ export function loadSingleOrgFallback() {
 /** The two platform factories — set once `DeployFactories.s.sol` has run. `undefined` on either
  *  side means the platform hasn't been onboarded onto self-serve org creation yet, in which case
  *  `orgSupervisor.ts` falls back to `loadSingleOrgFallback()`. */
+/** Parses an optional block-number env var, the server-side counterpart to `web/`'s
+ *  `NEXT_PUBLIC_*_DEPLOY_BLOCK` vars — same reason: public RPCs cap `eth_getLogs` ranges
+ *  (publicnode.com: 50,000 blocks), and a factory can't have emitted anything before its own
+ *  deployment, so backfilling from `fromBlock: "earliest"` on a chain with millions of blocks
+ *  reliably exceeds that cap and the whole supervisor fails to start. Unset falls back to
+ *  `"earliest"` — fine for Anvil/local, where the chain is young enough that it never hits the cap.
+ */
+function optionalBlock(envVar: string): bigint | "earliest" {
+  const value = process.env[envVar];
+  if (!value) return "earliest";
+  return BigInt(value);
+}
+
 export function loadFactories() {
   const sepolia = getSepoliaAddresses();
   const arc = getArcAddresses();
   return {
     orgFactory: sepolia.mandateOrgFactory,
     vaultFactory: arc.arcVaultFactory,
+    orgFactoryFromBlock: optionalBlock("SEPOLIA_MANDATE_ORG_FACTORY_DEPLOY_BLOCK"),
+    vaultFactoryFromBlock: optionalBlock("ARC_VAULT_FACTORY_DEPLOY_BLOCK"),
     rpc: getRpcUrls(),
   };
 }
