@@ -25,7 +25,51 @@ export default function DocsOverviewPage() {
         the agent&rsquo;s next payment dies mid-flight.
       </p>
 
-      <h2>Using the app</h2>
+      <h2>Creating your own organisation</h2>
+      <p>
+        Every mandate lives under an organisation&rsquo;s own ENSv2 registry — its own name, its
+        own admin, its own registrar that nobody else, including this site, can issue under.
+        &ldquo;Launch app&rdquo; opens the org directory; &ldquo;Create an organisation&rdquo;
+        starts the wizard. Concretely:
+      </p>
+      <ol>
+        <li>
+          <strong>Connect.</strong> The wallet you connect becomes the organisation&rsquo;s admin —
+          the address <code>MandateRegistrar.owner()</code> resolves to, and the only one that can
+          issue or revoke a mandate under it afterward.
+        </li>
+        <li>
+          <strong>Choose a name.</strong> A label — <code>acme</code> for <code>acme.eth</code> —
+          checked for real availability and priced live against ENSv2&rsquo;s own
+          <code>getRegisterPrice</code>, the same call a taken name reverts against.
+        </li>
+        <li>
+          <strong>Preflight.</strong> Three real balance checks, not assumptions: Sepolia ETH for
+          gas, Sepolia USDC for the registration price, Arc USDC for the vault you&rsquo;ll create
+          next. Each row links straight to a faucet if it&rsquo;s short.
+        </li>
+        <li>
+          <strong>Create the organisation.</strong> ENSv2 registers names through a commit-reveal
+          — a real, enforced wait between reserving the name and finalizing it, shown as a
+          countdown, not hidden behind a spinner. Once it clears, one transaction mints the name
+          and deploys the org&rsquo;s own registrar.
+        </li>
+        <li>
+          <strong>Create the Arc vault.</strong> A second, separate deploy — the org&rsquo;s
+          <code>MandateAnchor</code> and <code>AgentTreasury</code> on Arc, signed for by an
+          Enforcer key. The platform default is prefilled; an org running its own Enforcer
+          overrides it here.
+        </li>
+      </ol>
+      <p>
+        One honest gap: this wizard talks to <code>MandateOrgFactory</code> and{" "}
+        <code>ArcVaultFactory</code> — two contracts deployed once per platform instance, not per
+        organisation. Until an operator has run that one-time deploy, the wizard shows &ldquo;org
+        factory not configured&rdquo; instead of the steps above, and the only organisation that
+        exists is whichever one was seeded directly.
+      </p>
+
+      <h2>Using an existing organisation</h2>
       <p>
         Concretely, in order, with nothing skipped:
       </p>

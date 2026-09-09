@@ -43,6 +43,10 @@ registrar and anchor owners don't match, is skipped and logged rather than crash
 cast wallet new-mnemonic   # or: cast wallet import mandate-enforcer --interactive
 ```
 
+`pnpm dev` above is for local development only — it exits when your terminal does. Every mandate
+issued while nothing is running this process sits real on Sepolia with no enforcement mirrored to
+Arc/Privy. See `enforcer/deploy/README.md` to run it as a persistent systemd service on a VPS.
+
 ## What it does, in order
 
 1. **Discover.** Multi-org: backfills `OrgCreated`/`VaultCreated` from both factories, joins them

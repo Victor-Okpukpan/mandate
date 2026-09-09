@@ -36,8 +36,8 @@ packages/shared/       ABIs, addresses, decimals/ENS-key/merkle/role helpers —
 packages/ui/            Design tokens, type scale, shared React primitives
 landing/                 Next.js — the pitch + per-sponsor docs (runmandate.xyz)
 web/                      Next.js — the observatory (app.runmandate.xyz)
-enforcer/                 Off-chain service syncing ENS mandates to Privy + Arc (planned)
-agents/                    Mandated agent runtimes + the adversarial red-team agent (planned)
+enforcer/                 Off-chain service syncing ENS mandates to Privy + Arc — see enforcer/deploy/README.md to run it persistently
+agents/                    Mandated agent runtimes + the adversarial red-team agent
 ```
 
 ## Running locally
