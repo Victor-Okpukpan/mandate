@@ -219,8 +219,20 @@ Approvals, agent detail.
    invocations (within cap / over budget / after revoke).
 5. ✅ **Roadmap docs.** `landing/app/docs/roadmap/` — Jobs, sub-delegation,
    ownership quorums as next-version items.
-6. ◻ **Copy pass (F).** New files are terse. Still to sweep: landing `/` home,
-   `NotDeployed`, any remaining `Lede` slop in `agent/[name]`, `treasury`, `jobs`.
+6. ◻ **Copy pass (F).** New files are terse (onboard, dashboard, register-agent
+   all done). Still to sweep: landing `/` home, `NotDeployed`, `agent/[name]`.
+7. ✅ **Arc RPC resilience.** Arc's public RPC rejects `eth_getLogs` over any
+   useful range ("Request exceeds defined limit"). Vault discovery now reads
+   `vaultsOfAdmin`/`vaults` directly; `getContractEventsChunked` halves the
+   window on failure; the payments feed is live-watch + a 2k-block seed, no wide
+   backfill. Nothing throws unhandled anymore.
+
+### `testorg.eth` — the earlier org
+
+It still appears in `useOrgs` (it's in the factory's permanent `OrgCreated` log —
+that's the design). But it has no Arc vault, so `OrgGuard` won't let anyone into
+its pages, and the wizard offers **"Start a new organisation instead"** on the
+vault step rather than forcing you to finish it. A fresh run makes a new name.
 
 Then the user does one clean onboarding run on a fresh org name, funds the
 treasury from the dashboard, and we shoot the demo with `agents/demo-spend`.
