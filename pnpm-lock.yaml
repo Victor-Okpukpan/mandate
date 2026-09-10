@@ -46,6 +46,31 @@ importers:
         specifier: ^5.7.3
         version: 5.9.3
 
+  agents/demo-spend:
+    dependencies:
+      '@mandate/agents-shared':
+        specifier: workspace:*
+        version: link:../shared
+      '@mandate/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
+      '@privy-io/node':
+        specifier: 0.34.0
+        version: 0.34.0(@solana/kit@5.5.1(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6))(viem@2.56.3(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6)(zod@4.5.4))
+      viem:
+        specifier: ^2.56.3
+        version: 2.56.3(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6)(zod@4.5.4)
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.2
+        version: 22.20.1
+      tsx:
+        specifier: ^4.23.13
+        version: 4.23.13
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+
   agents/mandated:
     dependencies:
       '@anthropic-ai/sdk':

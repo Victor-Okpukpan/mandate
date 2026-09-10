@@ -1,0 +1,23 @@
+{
+  "name": "@mandate/demo-spend",
+  "version": "0.0.0",
+  "private": true,
+  "description": "No-LLM demo agent: attempts real treasury payments so a live run shows the mandate allowing, then blocking, then dying on revoke.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "spend": "tsx src/index.ts",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@mandate/agents-shared": "workspace:*",
+    "@mandate/shared": "workspace:*",
+    "@privy-io/node": "0.34.0",
+    "viem": "^2.56.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.23.13",
+    "typescript": "^5.7.3"
+  }
+}
