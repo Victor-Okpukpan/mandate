@@ -9,6 +9,7 @@ const SECTIONS = [
   { href: "/docs/privy", label: "Privy" },
   { href: "/docs/arc", label: "Arc" },
   { href: "/docs/security", label: "Security" },
+  { href: "/docs/roadmap", label: "Roadmap" },
   { href: "/docs/demo", label: "Demo" },
 ];
 

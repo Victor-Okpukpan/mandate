@@ -202,19 +202,28 @@ Approvals, agent detail.
 | **Approvals** | Tiered authorization keys protecting who can change an agent's wallet | Only if you demo the security-quorum story |
 | **agent/[name]** | One agent's records + Arc anchor + spend | Read-only detail |
 
-### Build order
+### Build order / progress
 
-1. **Wizard + guard (A, D).** The gated horizontal-timeline onboarding, ending
-   with the first agent. This is the thing blocking a clean run-through.
-2. **Agent registration (B).** Slim form — built as wizard step 6, reused
-   standalone.
-3. **Dashboard (C).** Fold in treasury balance + Fund + spent-per-agent + recent
-   payments. Hide Jobs/Treasury/Approvals from nav.
-4. **Demo script (E)** — `demo/agent-spend.ts`.
-5. **Copy pass (F).**
+1. ✅ **Wizard + guard (A, D).** `web/app/onboard/page.tsx` rebuilt as a gated
+   6-step timeline (`_components/StepTimeline.tsx`), resumable from chain state.
+   `OrgGuard` on the org layout bounces half-built orgs back to `/onboard`.
+   Nav cut to Dashboard + Register agent; Jobs/Treasury/Approvals behind
+   `NEXT_PUBLIC_SHOW_ADVANCED`.
+2. ✅ **Agent registration (B).** `_components/RegisterAgentForm.tsx` — 5 fields,
+   auto-provisioned wallet, advanced disclosure. Used as wizard step 6 and as the
+   standalone `/mandate/new` screen.
+3. ✅ **Dashboard (C).** Treasury balance + Fund control and a live
+   `AgentSpent` payments feed (`web/lib/usePaymentsFeed.ts`) folded in. Adversary
+   panel gated. Copy trimmed.
+4. ✅ **Demo script (E).** `agents/demo-spend/` — no-LLM `payTo` runner, three
+   invocations (within cap / over budget / after revoke).
+5. ✅ **Roadmap docs.** `landing/app/docs/roadmap/` — Jobs, sub-delegation,
+   ownership quorums as next-version items.
+6. ◻ **Copy pass (F).** New files are terse. Still to sweep: landing `/` home,
+   `NotDeployed`, any remaining `Lede` slop in `agent/[name]`, `treasury`, `jobs`.
 
-Then the user does one clean onboarding run on a fresh org name, and we shoot the
-demo.
+Then the user does one clean onboarding run on a fresh org name, funds the
+treasury from the dashboard, and we shoot the demo with `agents/demo-spend`.
 
 ---
 

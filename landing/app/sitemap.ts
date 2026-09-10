@@ -8,7 +8,7 @@ import { SITE_URL } from "@mandate/ui/seo";
  */
 export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date();
-  const docs = ["architecture", "ens", "privy", "arc", "security"].map((slug) => ({
+  const docs = ["architecture", "ens", "privy", "arc", "security", "roadmap"].map((slug) => ({
     url: `${SITE_URL}/docs/${slug}`,
     lastModified: now,
     changeFrequency: "monthly" as const,
