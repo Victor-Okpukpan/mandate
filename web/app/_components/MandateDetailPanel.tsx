@@ -215,9 +215,11 @@ export function MandateDetailPanel({ node, state, addresses, onRevoke, revoking 
           <p className="py-3 text-[13px] text-tertiary">Sign in to read this agent&rsquo;s live policy.</p>
         ) : privy.walletLoading ? (
           <p className="py-3 text-[13px] text-tertiary">Looking up the Privy wallet…</p>
+        ) : !agentWallet ? (
+          <p className="py-3 text-[13px] text-tertiary">Reading this mandate&rsquo;s agent wallet…</p>
         ) : !privy.wallet ? (
           <p className="py-3 text-[13px] text-tertiary">
-            No Privy server wallet found for <MonoValue value={agentWallet!} className="text-secondary" /> —
+            No Privy server wallet found for <MonoValue value={agentWallet} className="text-secondary" /> —
             it wasn&rsquo;t provisioned through this app, or belongs to a different Privy app.
           </p>
         ) : privy.policyLoading ? (
