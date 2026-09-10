@@ -1,8 +1,9 @@
 /**
- * Hand-written minimal standard ERC-20 fragment — reads and the two calls needed to pay with a
- * real token (`approve`/`allowance`), deliberately with no `mint`. For a genuinely mock,
- * permissionless-mint test token, use `MockERC20Abi` instead; this is for a real deployed token
- * (e.g. Circle's Sepolia USDC) this project has no special privilege over.
+ * Hand-written minimal standard ERC-20 fragment — reads, `transfer` (send funds out of a
+ * connected wallet), and the two calls needed to pay with a real token (`approve`/`allowance`),
+ * deliberately with no `mint`. For a genuinely mock, permissionless-mint test token, use
+ * `MockERC20Abi` instead; this is for a real deployed token (e.g. Circle's Sepolia USDC) this
+ * project has no special privilege over.
  */
 export const Erc20Abi = [
   {
@@ -45,5 +46,15 @@ export const Erc20Abi = [
       { name: "spender", type: "address" },
     ],
     outputs: [{ name: "", type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "transfer",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "to", type: "address" },
+      { name: "amount", type: "uint256" },
+    ],
+    outputs: [{ name: "", type: "bool" }],
   },
 ] as const;
