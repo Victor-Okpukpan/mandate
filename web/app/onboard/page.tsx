@@ -100,12 +100,20 @@ export default function OnboardPage() {
   );
 
   // ---- what's already on-chain for this admin -----------------------------------------------
+  // An org this admin abandoned half-built (registered, no vault) still shows up here forever —
+  // it's in the factory's own OrgCreated log, which is the whole point of event-sourced discovery.
+  // "Start a new one instead" adds its registrar here so the wizard stops trying to resume it.
+  const [ignoredRegistrars, setIgnoredRegistrars] = useState<string[]>([]);
   const { orgs } = useOrgs();
   const myOrg = useMemo(() => {
     if (!address) return undefined;
-    const mine = orgs.filter((o) => o.admin.toLowerCase() === address.toLowerCase());
+    const mine = orgs.filter(
+      (o) =>
+        o.admin.toLowerCase() === address.toLowerCase() &&
+        !ignoredRegistrars.includes(o.registrar.toLowerCase()),
+    );
     return mine.length > 0 ? mine[mine.length - 1] : undefined;
-  }, [orgs, address]);
+  }, [orgs, address, ignoredRegistrars]);
 
   const { nodes: mandateNodes } = useMandateGraph(myOrg?.registrar, myOrg?.createdAtBlock);
   const agentIssued = mandateNodes.length > 0;
@@ -185,6 +193,10 @@ export default function OnboardPage() {
           currentChainId={chainId}
           switchChain={switchChainAsync}
           arcClient={arcClient}
+          onStartFresh={() => {
+            setIgnoredRegistrars((prev) => [...prev, myOrg.registrar.toLowerCase()]);
+            setPreReserveStep("name");
+          }}
         />
       ) : null}
       {step === "agent" && myOrg && myOrg.vault ? (
@@ -519,6 +531,7 @@ function VaultStep({
   currentChainId,
   switchChain,
   arcClient,
+  onStartFresh,
 }: {
   org: { orgEnsName: string; admin: Address; orgRootNode: Hex };
   vaultFactory: Address | undefined;
@@ -526,6 +539,7 @@ function VaultStep({
   currentChainId?: number;
   switchChain: (args: { chainId: number }) => Promise<unknown>;
   arcClient: ReturnType<typeof usePublicClient>;
+  onStartFresh: () => void;
 }) {
   const { writeContractAsync, isPending } = useWriteContract();
   const [error, setError] = useState<string | undefined>();
@@ -563,12 +577,15 @@ function VaultStep({
             <p className="flex items-center gap-1.5 text-[12px] text-tertiary">
               enforcer <MonoValue value={enforcer} className="text-secondary" />
             </p>
-            <div className="mt-4">
+            <div className="mt-4 flex items-center gap-3">
               <Button onClick={create} disabled={isPending}>
                 {isPending ? "Creating…" : "Create vault on Arc"}
               </Button>
-              {error ? <p className="mt-2 text-[12px] text-revoked-strong">{error}</p> : null}
+              <button type="button" onClick={onStartFresh} className="text-[12px] text-tertiary hover:text-secondary">
+                Start a new organisation instead
+              </button>
             </div>
+            {error ? <p className="mt-2 text-[12px] text-revoked-strong">{error}</p> : null}
           </>
         )}
       </Card>

@@ -152,8 +152,8 @@ function TreasuryStrip({ treasury }: { treasury: Address }) {
 }
 
 /** Every agent payment under this org, newest first — where a running agent's spends show up. */
-function PaymentsFeed({ treasury, fromBlock }: { treasury: Address; fromBlock: bigint }) {
-  const { rows, loading } = usePaymentsFeed(treasury, fromBlock);
+function PaymentsFeed({ treasury }: { treasury: Address }) {
+  const { rows, loading } = usePaymentsFeed(treasury);
 
   return (
     <Card padding="lg">
@@ -286,7 +286,7 @@ function OrgOverview({ org }: { org: OrgWithVault }) {
         transition={{ delay: 0.16 }}
         className="mt-6"
       >
-        <PaymentsFeed treasury={org.vault!.treasury} fromBlock={org.vault!.createdAtBlock} />
+        <PaymentsFeed treasury={org.vault!.treasury} />
       </motion.div>
 
       <Drawer

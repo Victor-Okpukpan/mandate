@@ -66,7 +66,7 @@ export function useJobsFeed(treasury: Address | undefined, fromBlock: bigint | "
       );
       setLoading(false);
     }
-    backfill();
+    backfill().catch((e) => console.warn("[useJobsFeed] backfill failed", e));
     return () => {
       cancelled = true;
     };

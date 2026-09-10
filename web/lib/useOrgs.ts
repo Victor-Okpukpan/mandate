@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { usePublicClient, useWatchContractEvent } from "wagmi";
 import { sepolia, arcTestnet } from "viem/chains";
+import type { Address } from "viem";
 import { ArcVaultFactoryAbi, MandateOrgFactoryAbi } from "@mandate/shared/abis";
 import { getContractEventsChunked } from "@mandate/shared/eventLogs";
 import { joinOrgVaults, type Org, type Vault } from "@mandate/shared/orgs";
@@ -68,7 +69,7 @@ export function useOrgs() {
       );
       setLoading(false);
     }
-    backfill();
+    backfill().catch((e) => console.warn("[useOrgs] backfill failed", e));
     return () => {
       cancelled = true;
     };
@@ -95,34 +96,71 @@ export function useOrgs() {
     },
   });
 
+  // Vaults are read by direct contract call (`vaultsOfAdmin` → `vaults`), not from `VaultCreated`
+  // logs: Arc's public RPC rejects `eth_getLogs` over any range wide enough to matter
+  // ("Request exceeds defined limit"), and unlike Sepolia there's no chunk size small enough to
+  // get under it reliably. The factory's own view functions have no such cap. Admins come from
+  // the org list (already read from Sepolia, which works fine).
+  const admins = useMemo(
+    () => Array.from(new Set(orgs.map((o) => o.admin.toLowerCase()))) as Address[],
+    [orgs],
+  );
+  const adminsKey = admins.join(",");
+
   useEffect(() => {
-    if (!addresses.arcVaultFactory || !arcClient) return;
+    if (!addresses.arcVaultFactory || !arcClient || admins.length === 0) return;
     let cancelled = false;
 
-    async function backfill() {
-      const logs = await getContractEventsChunked(arcClient!, {
-        address: addresses.arcVaultFactory!,
-        abi: ArcVaultFactoryAbi,
-        eventName: "VaultCreated",
-        fromBlock: VAULT_FACTORY_DEPLOY_BLOCK,
-      });
+    async function load() {
+      const anchorLists = await Promise.all(
+        admins.map((admin) =>
+          arcClient!
+            .readContract({
+              address: addresses.arcVaultFactory!,
+              abi: ArcVaultFactoryAbi,
+              functionName: "vaultsOfAdmin",
+              args: [admin],
+            })
+            .catch(() => [] as readonly Address[]),
+        ),
+      );
+      const anchors = Array.from(new Set(anchorLists.flat()));
+      const details = await Promise.all(
+        anchors.map((anchor) =>
+          arcClient!
+            .readContract({
+              address: addresses.arcVaultFactory!,
+              abi: ArcVaultFactoryAbi,
+              functionName: "vaults",
+              args: [anchor],
+            })
+            .catch(() => null),
+        ),
+      );
       if (cancelled) return;
       setVaults(
-        logs.map((log) => ({
-          anchor: log.args.anchor!,
-          treasury: log.args.treasury!,
-          admin: log.args.admin!,
-          enforcer: log.args.enforcer!,
-          orgRootNode: log.args.orgRootNode!,
-          createdAtBlock: log.blockNumber,
-        })),
+        details
+          .filter((d): d is NonNullable<typeof d> => d !== null)
+          .map((d) => ({
+            anchor: d[0],
+            treasury: d[1],
+            admin: d[2],
+            enforcer: "0x0000000000000000000000000000000000000000" as Address,
+            orgRootNode: d[3],
+            // `vaults().createdAt` is a block.timestamp, not a block number — the factory deploy
+            // block is the only safe lower bound available without an Arc log query.
+            createdAtBlock: VAULT_FACTORY_DEPLOY_BLOCK === "earliest" ? 0n : VAULT_FACTORY_DEPLOY_BLOCK,
+          })),
       );
     }
-    backfill();
+    load().catch((e) => console.warn("[useOrgs] vault load failed", e));
+    const id = setInterval(() => load().catch(() => {}), 12_000);
     return () => {
       cancelled = true;
+      clearInterval(id);
     };
-  }, [addresses.arcVaultFactory, arcClient]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [addresses.arcVaultFactory, arcClient, adminsKey]);
 
   useWatchContractEvent({
     address: addresses.arcVaultFactory,

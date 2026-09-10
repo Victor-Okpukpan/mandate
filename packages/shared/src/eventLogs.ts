@@ -36,15 +36,27 @@ export async function getContractEventsChunked<
   if (from > latest) return [] as GetContractEventsReturnType<abi, eventName>;
 
   const allLogs: GetContractEventsReturnType<abi, eventName> = [];
+  // Providers disagree on the range cap (publicnode.com's Sepolia: 50k; Arc's endpoint is much
+  // smaller and undocumented), so on a failed chunk, halve the window and retry down to a floor
+  // rather than hard-coding one number per chain. A genuinely broken RPC still surfaces its error
+  // once `span` hits the floor.
+  const FLOOR = 1_000n;
+  let span = chunkBlocks;
   while (from <= latest) {
-    const to = from + chunkBlocks - 1n > latest ? latest : from + chunkBlocks - 1n;
-    const logs = await client.getContractEvents({
-      ...rest,
-      fromBlock: from,
-      toBlock: to,
-    } as GetContractEventsParameters<abi, eventName>);
-    allLogs.push(...(logs as GetContractEventsReturnType<abi, eventName>));
-    from = to + 1n;
+    const to = from + span - 1n > latest ? latest : from + span - 1n;
+    try {
+      const logs = await client.getContractEvents({
+        ...rest,
+        fromBlock: from,
+        toBlock: to,
+      } as GetContractEventsParameters<abi, eventName>);
+      allLogs.push(...(logs as GetContractEventsReturnType<abi, eventName>));
+      from = to + 1n;
+      if (span < chunkBlocks) span = span * 2n > chunkBlocks ? chunkBlocks : span * 2n;
+    } catch (err) {
+      if (span <= FLOOR) throw err;
+      span = span / 2n < FLOOR ? FLOOR : span / 2n;
+    }
   }
   return allLogs;
 }
