@@ -5,7 +5,7 @@ import { useAccount, useBalance, useReadContract } from "wagmi";
 import { sepolia, arcTestnet } from "viem/chains";
 import { formatUnits } from "viem";
 import { usePrivy } from "@privy-io/react-auth";
-import { MockERC20Abi } from "@mandate/shared/abis";
+import { Erc20Abi } from "@mandate/shared/abis";
 import { fromErc20Usdc } from "@mandate/shared/decimals";
 import { getPublicSepoliaAddresses } from "@/lib/publicNetworkAddresses";
 
@@ -35,8 +35,8 @@ export function WalletMenu() {
 
   const { data: sepoliaEth } = useBalance({ address, chainId: sepolia.id, query: { enabled: open } });
   const { data: sepoliaUsdc } = useReadContract({
-    address: sepoliaAddrs.mockUsdc,
-    abi: MockERC20Abi,
+    address: sepoliaAddrs.usdc,
+    abi: Erc20Abi,
     functionName: "balanceOf",
     args: address ? [address] : undefined,
     chainId: sepolia.id,

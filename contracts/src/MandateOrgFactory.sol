@@ -33,16 +33,19 @@ import { MandateRegistrarDeployer } from "contracts/MandateRegistrarDeployer.sol
 ///      registrar if a label is later sniped, in exchange for never guessing.
 ///
 ///      Payment is real: `getRegisterPrice` is quoted fresh in `finalizeOrg` and pulled via
-///      `safeTransferFrom` — this contract never mints anything. `getRegisterPrice` does revert
-///      `PaymentTokenNotSupported` for an arbitrary token (confirmed live against a random address
-///      and against Sepolia WETH, both rejected) — but the deployed Sepolia beta ETHRegistrar's
-///      allowlist is NOT limited to this contract's own `MockUSDC`: Circle's real Sepolia USDC
-///      (0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238) is accepted too, confirmed live including a
-///      full commit→register cycle actually paying in it on a fork. `PAYMENT_TOKEN` is
-///      `MockUSDC` by choice, not by necessity — because it's permissionless to mint, which is
-///      what lets the onboarding wizard's "get test USDC" button exist without depending on
-///      Circle's own (rate-limited, external) faucet. `PAYMENT_TOKEN` is immutable because that
-///      choice, once a factory is deployed, shouldn't silently change under orgs already using it.
+///      `safeTransferFrom` — this contract never mints anything, and `PAYMENT_TOKEN` is Circle's
+///      real Sepolia USDC (0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238), not a project-specific
+///      mock token. `getRegisterPrice` does revert `PaymentTokenNotSupported` for an arbitrary
+///      token — confirmed live against a random address and against Sepolia WETH, both correctly
+///      rejected — but the deployed Sepolia beta `ETHRegistrar`'s allowlist accepts Circle's real
+///      USDC directly; confirmed with a full commit→register cycle actually paying in it on a
+///      fork, not just the price quote. An earlier version of this contract used its own
+///      permissionlessly-mintable `MockUSDC` instead, specifically so the onboarding wizard could
+///      offer a zero-friction "get test USDC" button — that convenience was traded away in favor
+///      of every org paying in the same real token every other Sepolia project already uses,
+///      rather than one only this site's own button could produce. `PAYMENT_TOKEN` is immutable
+///      because that choice, once a factory is deployed, shouldn't silently change under orgs
+///      already using it.
 ///
 ///      Front-running: `makeCommitment` is `pure` and every argument is visible once `commit` is
 ///      submitted, but an observer cannot redirect the org — changing `owner` or `subregistry`

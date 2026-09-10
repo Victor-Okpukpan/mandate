@@ -12,8 +12,10 @@ export function getPublicSepoliaAddresses() {
   return {
     ethRegistrar: (process.env.NEXT_PUBLIC_SEPOLIA_ETH_REGISTRAR ??
       "0xa88553F454b77203B0D036A05c894d555EAAa2Cc") as Address,
-    mockUsdc: (process.env.NEXT_PUBLIC_SEPOLIA_MOCK_USDC ??
-      "0x768F42455A2D082E23ceeF7d51e5787C82d67a39") as Address,
+    /** Circle's real Sepolia USDC — confirmed live to be accepted by ETHRegistrar's own
+     *  `getRegisterPrice`/`register` `paymentToken` allowlist. Not a mock. */
+    usdc: (process.env.NEXT_PUBLIC_SEPOLIA_USDC ??
+      "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238") as Address,
   };
 }
 

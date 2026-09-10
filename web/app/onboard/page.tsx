@@ -17,7 +17,7 @@ import {
   ArcVaultFactoryAbi,
   ETHRegistrarAbi,
   MandateOrgFactoryAbi,
-  MockERC20Abi,
+  Erc20Abi,
 } from "@mandate/shared/abis";
 import { fromErc20Usdc } from "@mandate/shared/decimals";
 import { Button } from "@mandate/ui/components/Button";
@@ -69,7 +69,7 @@ export default function OnboardPage() {
     address: sepoliaAddrs.ethRegistrar,
     abi: ETHRegistrarAbi,
     functionName: "getRegisterPrice",
-    args: [label, REGISTRATION_DURATION, sepoliaAddrs.mockUsdc],
+    args: [label, REGISTRATION_DURATION, sepoliaAddrs.usdc],
     chainId: sepolia.id,
     query: { enabled: labelValid && isAvailable === true },
   });
@@ -77,8 +77,8 @@ export default function OnboardPage() {
   // ---- 2. preflight ---------------------------------------------------------------------------
   const { data: sepoliaEth } = useBalance({ address, chainId: sepolia.id, query: { enabled: isConnected } });
   const { data: sepoliaUsdc } = useReadContract({
-    address: sepoliaAddrs.mockUsdc,
-    abi: MockERC20Abi,
+    address: sepoliaAddrs.usdc,
+    abi: Erc20Abi,
     functionName: "balanceOf",
     args: address ? [address] : undefined,
     chainId: sepolia.id,
@@ -86,7 +86,7 @@ export default function OnboardPage() {
   });
   const { data: arcUsdc } = useReadContract({
     address: arcAddrs.usdc,
-    abi: MockERC20Abi,
+    abi: Erc20Abi,
     functionName: "balanceOf",
     args: address ? [address] : undefined,
     chainId: arcTestnet.id,
@@ -96,18 +96,6 @@ export default function OnboardPage() {
   const hasGas = Boolean(sepoliaEth && sepoliaEth.value > 0n);
   const hasSepoliaUsdc = Boolean(quotedPrice && sepoliaUsdc !== undefined && (sepoliaUsdc as bigint) >= quotedPrice);
   const hasArcUsdc = Boolean(arcUsdc && (arcUsdc as bigint) > 0n);
-
-  const { writeContractAsync: mintUsdc, isPending: minting } = useWriteContract();
-  async function handleGetTestUsdc() {
-    if (!address) return;
-    await mintUsdc({
-      address: sepoliaAddrs.mockUsdc,
-      abi: MockERC20Abi,
-      functionName: "mint",
-      args: [address, 1_000_000_000n], // 1,000 USDC — far more than any 28-day registration costs
-      chainId: sepolia.id,
-    });
-  }
 
   // ---- 3. reserve (beginOrg) ------------------------------------------------------------------
   interface Reservation {
@@ -198,8 +186,8 @@ export default function OnboardPage() {
     setFinalizeError(undefined);
     try {
       const approveHash = await writeApprove({
-        address: sepoliaAddrs.mockUsdc,
-        abi: MockERC20Abi,
+        address: sepoliaAddrs.usdc,
+        abi: Erc20Abi,
         functionName: "approve",
         args: [orgFactory, quotedPrice],
         chainId: sepolia.id,
@@ -326,7 +314,9 @@ export default function OnboardPage() {
             <Card padding="lg">
               <RuleLabel>3 · Preflight</RuleLabel>
               <p className="mt-2 text-[12px] text-tertiary">
-                Nothing here is minted by this site — every check is a real balance.
+                Nothing here is minted by this site — every balance and every payment is real,
+                including Sepolia USDC: Circle's real testnet token, confirmed accepted by ENSv2's
+                own registrar, not a token only this site can produce.
               </p>
               <div className="mt-4 flex flex-col gap-2.5">
                 <PreflightRow
@@ -349,13 +339,14 @@ export default function OnboardPage() {
                   label="Sepolia USDC"
                   hint={quotedPrice ? `${fromErc20Usdc(quotedPrice)} USDC needed` : "checking price…"}
                   action={
-                    <button
-                      onClick={handleGetTestUsdc}
-                      disabled={minting || !isConnected}
-                      className="text-[12px] text-accent hover:underline disabled:opacity-50"
+                    <a
+                      href="https://faucet.circle.com"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[12px] text-accent hover:underline"
                     >
-                      {minting ? "minting…" : "get test USDC →"}
-                    </button>
+                      faucet →
+                    </a>
                   }
                 />
                 <PreflightRow

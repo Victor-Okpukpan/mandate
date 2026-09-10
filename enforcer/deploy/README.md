@@ -52,7 +52,7 @@ Not the full 58-var list — just what `enforcer/src/config.ts` actually reads:
   `SEPOLIA_ROOT_REGISTRY`, `SEPOLIA_ETH_REGISTRY`, `SEPOLIA_ETH_REGISTRAR`,
   `SEPOLIA_USER_REGISTRY_IMPL`, `SEPOLIA_PERMISSIONED_RESOLVER_IMPL`,
   `SEPOLIA_UNIVERSAL_RESOLVER_V2`, `SEPOLIA_VERIFIABLE_FACTORY`, `SEPOLIA_RENT_PRICE_ORACLE`,
-  `SEPOLIA_MOCK_USDC`, `ARC_USDC`, `ARC_ERC8004_IDENTITY`, `ARC_ERC8004_REPUTATION`,
+  `SEPOLIA_USDC`, `ARC_USDC`, `ARC_ERC8004_IDENTITY`, `ARC_ERC8004_REPUTATION`,
   `ARC_ERC8004_VALIDATION`, `ARC_ERC8183_JOBS`. Easiest to just copy the whole `.env.example` and
   fill in the org/secret-specific lines below, rather than hand-picking a subset — this list was
   hand-picked once already and missed these.

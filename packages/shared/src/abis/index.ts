@@ -5,6 +5,7 @@ export { PermissionedResolverAbi } from "./PermissionedResolver";
 export { JobsAbi } from "./Jobs";
 export { ETHRegistrarAbi } from "./ETHRegistrar";
 export { MockERC20Abi } from "./MockERC20";
+export { Erc20Abi } from "./ERC20";
 export { MandateOrgFactoryAbi } from "./MandateOrgFactory";
 export { ArcVaultFactoryAbi } from "./ArcVaultFactory";
 export { MandateRegistrarDeployerAbi } from "./MandateRegistrarDeployer";

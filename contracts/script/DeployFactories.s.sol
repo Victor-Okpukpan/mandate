@@ -51,8 +51,14 @@ contract DeployFactories is Script {
         );
         address ethRegistrarAddr =
             vm.envOr("SEPOLIA_ETH_REGISTRAR", address(0xa88553F454b77203B0D036A05c894d555EAAa2Cc));
+        // Circle's real Sepolia USDC, confirmed live to be accepted by ETHRegistrar's own
+        // PaymentTokenNotSupported allowlist — see MandateOrgFactory.sol's NatSpec for the full
+        // verification (a random address and Sepolia WETH both correctly get rejected, so this
+        // isn't "any ERC-20 works"; Circle's specifically is allowlisted, same as the project's
+        // own now-retired MockUSDC was). Real payment in a real, widely-held token, not a
+        // project-specific one only this site's own faucet button could produce.
         address paymentToken =
-            vm.envOr("SEPOLIA_MOCK_USDC", address(0x768F42455A2D082E23ceeF7d51e5787C82d67a39));
+            vm.envOr("SEPOLIA_USDC", address(0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238));
         address factoryOwner = vm.envOr("SEPOLIA_MANDATE_ORG_FACTORY_OWNER", msg.sender);
 
         bytes memory ethDns = LibDNSEncode.prependLabel("eth", hex"00");

@@ -37,7 +37,11 @@ export function getSepoliaAddresses() {
     universalResolverV2: requireAddress("SEPOLIA_UNIVERSAL_RESOLVER_V2"),
     verifiableFactory: requireAddress("SEPOLIA_VERIFIABLE_FACTORY"),
     rentPriceOracle: requireAddress("SEPOLIA_RENT_PRICE_ORACLE"),
-    mockUsdc: requireAddress("SEPOLIA_MOCK_USDC"),
+    /** Circle's real Sepolia USDC — confirmed live to be one of the tokens ENSv2's
+     *  ETHRegistrar accepts as `paymentToken` for `getRegisterPrice`/`register`, alongside its
+     *  own now-retired project-specific `MockUSDC`. Not a mock: real, permissioned only by
+     *  Circle's actual faucet, the same token every other Sepolia project already uses. */
+    usdc: requireAddress("SEPOLIA_USDC"),
     mandateOrgFactory: optionalAddress("SEPOLIA_MANDATE_ORG_FACTORY"),
     /** Single-org fallback — the registrar one run of the factory flow (or the old
      *  now-deleted DeploySepolia.s.sol) produced. Multi-org callers should read
