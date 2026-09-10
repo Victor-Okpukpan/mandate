@@ -24,6 +24,7 @@ import { getDeployedAddresses } from "@/lib/addresses";
 import { getPublicSepoliaAddresses, getPublicArcAddresses } from "@/lib/publicNetworkAddresses";
 import { useOrgs } from "@/lib/useOrgs";
 import { useMandateGraph } from "@/lib/useMandateGraph";
+import { formatTxError } from "@/lib/txError";
 import { ConnectButton } from "@/app/_components/ConnectButton";
 import { StepTimeline } from "./_components/StepTimeline";
 import { RegisterAgentForm } from "./_components/RegisterAgentForm";
@@ -375,12 +376,15 @@ function FundStep({
   const ready = hasGas && hasUsdc && hasArc && LABEL_RE.test(label);
 
   const { writeContractAsync, isPending } = useWriteContract();
+  const { switchChainAsync } = useSwitchChain();
+  const { chainId } = useAccount();
   const [error, setError] = useState<string | undefined>();
 
   async function reserve() {
     setError(undefined);
     if (!sepoliaClient) return;
     try {
+      if (chainId !== sepolia.id) await switchChainAsync({ chainId: sepolia.id });
       const salt = crypto.getRandomValues(new Uint8Array(32));
       const saltHex = `0x${Array.from(salt).map((b) => b.toString(16).padStart(2, "0")).join("")}` as Hex;
       const hash = await writeContractAsync({
@@ -401,7 +405,7 @@ function FundStep({
         label,
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(formatTxError(err));
     }
   }
 
@@ -481,6 +485,8 @@ function RegisterStep({
   const canRegister = remaining === 0 && minAge !== undefined;
 
   const { writeContractAsync, isPending } = useWriteContract();
+  const { switchChainAsync } = useSwitchChain();
+  const { chainId } = useAccount();
   const [error, setError] = useState<string | undefined>();
   const [finalized, setFinalized] = useState(false);
 
@@ -488,6 +494,7 @@ function RegisterStep({
     setError(undefined);
     if (!sepoliaClient) return;
     try {
+      if (chainId !== sepolia.id) await switchChainAsync({ chainId: sepolia.id });
       const approveHash = await writeContractAsync({
         address: usdc,
         abi: Erc20Abi,
@@ -507,7 +514,7 @@ function RegisterStep({
       setFinalized(true);
       // useOrgs' live watch picks up OrgCreated and advances the flow to the vault step.
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(formatTxError(err));
     }
   }
 
@@ -572,7 +579,7 @@ function VaultStep({
       await arcClient.waitForTransactionReceipt({ hash });
       // useOrgs' VaultCreated watch advances the flow to the agent step.
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(formatTxError(err));
     }
   }
 

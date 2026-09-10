@@ -15,6 +15,7 @@ import { usePrivy } from "@privy-io/react-auth";
 import { Erc20Abi } from "@mandate/shared/abis";
 import { fromErc20Usdc } from "@mandate/shared/decimals";
 import { getPublicSepoliaAddresses } from "@/lib/publicNetworkAddresses";
+import { formatTxError } from "@/lib/txError";
 
 const SEPOLIA_EXPLORER = "https://sepolia.etherscan.io/address";
 const ARC_EXPLORER = "https://testnet.arcscan.app/address";
@@ -103,7 +104,7 @@ function SendForm({
       setTo("");
       setAmount("");
     } catch (err) {
-      setError(err instanceof Error ? err.message.split("\n")[0] : String(err));
+      setError(formatTxError(err));
     }
   }
 

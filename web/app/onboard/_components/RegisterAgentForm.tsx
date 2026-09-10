@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useWaitForTransactionReceipt, useWriteContract } from "wagmi";
+import { useAccount, useSwitchChain, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
 import { sepolia } from "viem/chains";
 import { parseUnits, type Address } from "viem";
 import { MandateRegistrarAbi } from "@mandate/shared/abis";
@@ -10,6 +10,7 @@ import type { OrgWithVault } from "@mandate/shared/orgs";
 import { Button } from "@mandate/ui/components/Button";
 import { Field, Input, Textarea } from "@mandate/ui/components/Field";
 import { useOptionalPrivy } from "@/lib/usePrivyMandateStatus";
+import { formatTxError } from "@/lib/txError";
 
 const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 const LABEL_RE = /^[a-z0-9-]{1,63}$/;
@@ -44,6 +45,8 @@ export function RegisterAgentForm({
   const [formError, setFormError] = useState<string | undefined>();
 
   const { writeContractAsync, data: txHash } = useWriteContract();
+  const { switchChainAsync } = useSwitchChain();
+  const { chainId } = useAccount();
   const { isSuccess: confirmed } = useWaitForTransactionReceipt({ hash: txHash, chainId: sepolia.id });
 
   useEffect(() => {
@@ -90,6 +93,8 @@ export function RegisterAgentForm({
       if (!res.ok) throw new Error(body.error ?? `Wallet provisioning failed (${res.status})`);
       const wallet = body.address as Address;
 
+      if (chainId !== sepolia.id) await switchChainAsync({ chainId: sepolia.id });
+
       const tree = buildAllowlist(recipients as Address[]);
       const allowHumanJson = JSON.stringify(recipients.map((r) => ({ target: r })));
       const terms = {
@@ -109,7 +114,7 @@ export function RegisterAgentForm({
         chainId: sepolia.id,
       });
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : String(err));
+      setFormError(formatTxError(err));
       setBusy(false);
     }
   }

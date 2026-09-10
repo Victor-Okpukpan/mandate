@@ -2,7 +2,7 @@
 
 import { use, useMemo, useState } from "react";
 import { motion } from "motion/react";
-import { useAccount, usePublicClient, useReadContract, useWriteContract } from "wagmi";
+import { useAccount, usePublicClient, useReadContract, useSwitchChain, useWriteContract } from "wagmi";
 import { sepolia, arcTestnet } from "viem/chains";
 import { maxUint256, parseUnits, type Address, type Hex } from "viem";
 import { AgentTreasuryAbi, Erc20Abi, MandateRegistrarAbi } from "@mandate/shared/abis";
@@ -22,6 +22,7 @@ import { useSelectedOrg } from "@/lib/useSelectedOrg";
 import { mandateStateOf, useMandateGraph } from "@/lib/useMandateGraph";
 import { useMandateLabels } from "@/lib/useMandateLabels";
 import { usePaymentsFeed } from "@/lib/usePaymentsFeed";
+import { formatTxError } from "@/lib/txError";
 import { useAdversaryAttempts } from "@/lib/useAdversaryAttempts";
 import { useIsOrgAdmin } from "@/lib/useIsOrgAdmin";
 import { MandateTree } from "@/app/_components/MandateTree";
@@ -77,11 +78,13 @@ function AdversaryPanel() {
  */
 function TreasuryStrip({ treasury }: { treasury: Address }) {
   const arcAddrs = getPublicArcAddresses();
-  const { address } = useAccount();
+  const { address, chainId } = useAccount();
+  const { switchChainAsync } = useSwitchChain();
   const arcClient = usePublicClient({ chainId: arcTestnet.id });
-  const { writeContractAsync, isPending } = useWriteContract();
+  const { writeContractAsync } = useWriteContract();
   const [amount, setAmount] = useState("");
   const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | undefined>();
 
   const { data: deposited, refetch: refetchDep } = useReadContract({
@@ -100,17 +103,31 @@ function TreasuryStrip({ treasury }: { treasury: Address }) {
   async function fund() {
     setError(undefined);
     if (!arcClient || !address) return;
+    const value = parseUnits(amount || "0", 6);
+    if (value <= 0n) {
+      setError("Enter an amount.");
+      return;
+    }
+    setBusy(true);
     try {
-      const value = parseUnits(amount || "0", 6);
-      if (value <= 0n) throw new Error("Enter an amount.");
-      const approveHash = await writeContractAsync({
+      if (chainId !== arcTestnet.id) await switchChainAsync({ chainId: arcTestnet.id });
+
+      const allowance = await arcClient.readContract({
         address: arcAddrs.usdc,
         abi: Erc20Abi,
-        functionName: "approve",
-        args: [treasury, maxUint256],
-        chainId: arcTestnet.id,
+        functionName: "allowance",
+        args: [address, treasury],
       });
-      await arcClient.waitForTransactionReceipt({ hash: approveHash });
+      if (allowance < value) {
+        const approveHash = await writeContractAsync({
+          address: arcAddrs.usdc,
+          abi: Erc20Abi,
+          functionName: "approve",
+          args: [treasury, maxUint256],
+          chainId: arcTestnet.id,
+        });
+        await arcClient.waitForTransactionReceipt({ hash: approveHash });
+      }
       const depHash = await writeContractAsync({
         address: treasury,
         abi: AgentTreasuryAbi,
@@ -123,7 +140,9 @@ function TreasuryStrip({ treasury }: { treasury: Address }) {
       setOpen(false);
       refetchDep();
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(formatTxError(err));
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -141,8 +160,8 @@ function TreasuryStrip({ treasury }: { treasury: Address }) {
       {open ? (
         <div className="mt-4 flex items-end gap-3">
           <Input mono type="number" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="100" />
-          <Button size="sm" onClick={fund} disabled={isPending}>
-            {isPending ? "Funding…" : "Deposit USDC"}
+          <Button size="sm" onClick={fund} disabled={busy}>
+            {busy ? "Funding…" : "Deposit USDC"}
           </Button>
         </div>
       ) : null}
