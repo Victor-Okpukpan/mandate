@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { buildAppMetadata } from "../../../lib/seo";
+import { OrgGuard } from "./_components/OrgGuard";
 
 /**
  * A server layout wrapping every client page under `/org/[orgEnsName]/*` — same reasoning as
@@ -23,5 +24,5 @@ export async function generateMetadata({
 }
 
 export default function OrgLayout({ children }: { children: React.ReactNode }) {
-  return children;
+  return <OrgGuard>{children}</OrgGuard>;
 }

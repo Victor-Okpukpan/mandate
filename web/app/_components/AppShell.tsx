@@ -23,13 +23,18 @@ export function AppShell({ children }: { children: ReactNode }) {
   const orgEnsName = orgSlug ? decodeURIComponent(orgSlug) : null;
   const base = orgSlug ? `/org/${orgSlug}` : null;
 
+  const showAdvanced = process.env.NEXT_PUBLIC_SHOW_ADVANCED === "true";
   const routes = base
     ? [
-        { href: base, label: "Mandates" },
-        { href: `${base}/mandate/new`, label: "Issue mandate" },
-        { href: `${base}/jobs`, label: "Jobs" },
-        { href: `${base}/treasury`, label: "Treasury" },
-        { href: `${base}/approvals`, label: "Approvals" },
+        { href: base, label: "Dashboard" },
+        { href: `${base}/mandate/new`, label: "Register agent" },
+        ...(showAdvanced
+          ? [
+              { href: `${base}/jobs`, label: "Jobs" },
+              { href: `${base}/treasury`, label: "Treasury" },
+              { href: `${base}/approvals`, label: "Approvals" },
+            ]
+          : []),
       ]
     : [{ href: "/", label: "Organisations" }];
 

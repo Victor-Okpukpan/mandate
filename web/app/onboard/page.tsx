@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   useAccount,
@@ -8,44 +8,62 @@ import {
   usePublicClient,
   useReadContract,
   useSwitchChain,
-  useWaitForTransactionReceipt,
   useWriteContract,
 } from "wagmi";
 import { sepolia, arcTestnet } from "viem/chains";
-import { parseEventLogs, parseUnits, type Address, type Hex } from "viem";
-import {
-  ArcVaultFactoryAbi,
-  ETHRegistrarAbi,
-  MandateOrgFactoryAbi,
-  Erc20Abi,
-} from "@mandate/shared/abis";
+import { maxUint256, parseEventLogs, type Address, type Hex } from "viem";
+import { ArcVaultFactoryAbi, ETHRegistrarAbi, MandateOrgFactoryAbi, Erc20Abi } from "@mandate/shared/abis";
 import { fromErc20Usdc } from "@mandate/shared/decimals";
 import { Button } from "@mandate/ui/components/Button";
 import { Card } from "@mandate/ui/components/Card";
 import { Field, Input } from "@mandate/ui/components/Field";
-import { Display, Eyebrow, Lede, RuleLabel } from "@mandate/ui/components/Type";
+import { Display, Eyebrow } from "@mandate/ui/components/Type";
 import { MonoValue } from "@mandate/ui/components/MonoValue";
 import { getDeployedAddresses } from "@/lib/addresses";
 import { getPublicSepoliaAddresses, getPublicArcAddresses } from "@/lib/publicNetworkAddresses";
+import { useOrgs } from "@/lib/useOrgs";
+import { useMandateGraph } from "@/lib/useMandateGraph";
 import { ConnectButton } from "@/app/_components/ConnectButton";
+import { StepTimeline } from "./_components/StepTimeline";
+import { RegisterAgentForm } from "./_components/RegisterAgentForm";
 
 const LABEL_RE = /^[a-z0-9-]{3,63}$/;
+const REGISTRATION_DURATION = 2_419_200n; // 28 days — matches MandateOrgFactory's default
+
+const TIMELINE = [
+  { id: "connect", label: "Connect" },
+  { id: "name", label: "Name" },
+  { id: "fund", label: "Add funds" },
+  { id: "register", label: "Register" },
+  { id: "vault", label: "Arc vault" },
+  { id: "agent", label: "First agent" },
+];
+type StepId = (typeof TIMELINE)[number]["id"];
+
+interface Reservation {
+  commitment: Hex;
+  orgRootNode: Hex;
+  committedAt: number;
+  label: string;
+}
+
+function storageKey(address?: string) {
+  return address ? `mandate:onboard:${address.toLowerCase()}` : null;
+}
 
 /**
- * Self-serve org onboarding — HOW-IT-WORKS.md §4: "a button, not a script." Everything below maps
- * to a real, fork-tested call on `MandateOrgFactory`/`ArcVaultFactory`
- * (contracts/test/fork/MandateOrgFactoryFork.t.sol); nothing here is simulated. Built as a
- * progressive checklist rather than a rigid multi-page wizard specifically because step 4→5 has a
- * real, unavoidable wait (ENSv2's commit-reveal, MIN_COMMITMENT_AGE=60s on Sepolia,
- * MAX_COMMITMENT_AGE=86400s) — a page-per-step flow would strand the visitor on a blank
- * "please wait" screen instead of showing the whole shape of what's left.
+ * One gated flow, one horizontal timeline. The step is derived — never a free counter: the chain
+ * (and `useOrgs`/`useMandateGraph` reading its logs) is the source of truth for what's done, and
+ * localStorage only carries the one thing not yet on-chain, the commit secret between `beginOrg`
+ * and `finalizeOrg`. Refreshing mid-flow lands you back on the right step. Finishing sends you to
+ * the dashboard with a live agent already in the tree.
  */
 export default function OnboardPage() {
+  const router = useRouter();
   const { address, isConnected, chainId } = useAccount();
   const { switchChainAsync } = useSwitchChain();
-  const publicClient = usePublicClient({ chainId: sepolia.id });
-  const arcPublicClient = usePublicClient({ chainId: arcTestnet.id });
-  const router = useRouter();
+  const sepoliaClient = usePublicClient({ chainId: sepolia.id });
+  const arcClient = usePublicClient({ chainId: arcTestnet.id });
 
   const platform = getDeployedAddresses();
   const sepoliaAddrs = getPublicSepoliaAddresses();
@@ -53,422 +71,342 @@ export default function OnboardPage() {
   const orgFactory = platform.mandateOrgFactory;
   const vaultFactory = platform.arcVaultFactory;
 
-  // ---- 1. name ------------------------------------------------------------------------------
-  const [label, setLabel] = useState("");
-  const labelValid = LABEL_RE.test(label);
-  const { data: isAvailable, isLoading: checkingAvailability } = useReadContract({
-    address: sepoliaAddrs.ethRegistrar,
-    abi: ETHRegistrarAbi,
-    functionName: "isAvailable",
-    args: [label],
-    chainId: sepolia.id,
-    query: { enabled: labelValid },
-  });
-  const REGISTRATION_DURATION = 2_419_200n; // 28 days, matches MandateOrgFactory's default
-  const { data: quotedPrice } = useReadContract({
-    address: sepoliaAddrs.ethRegistrar,
-    abi: ETHRegistrarAbi,
-    functionName: "getRegisterPrice",
-    args: [label, REGISTRATION_DURATION, sepoliaAddrs.usdc],
-    chainId: sepolia.id,
-    query: { enabled: labelValid && isAvailable === true },
-  });
-
-  // ---- 2. preflight ---------------------------------------------------------------------------
-  const { data: sepoliaEth } = useBalance({ address, chainId: sepolia.id, query: { enabled: isConnected } });
-  const { data: sepoliaUsdc } = useReadContract({
-    address: sepoliaAddrs.usdc,
-    abi: Erc20Abi,
-    functionName: "balanceOf",
-    args: address ? [address] : undefined,
-    chainId: sepolia.id,
-    query: { enabled: isConnected },
-  });
-  const { data: arcUsdc } = useReadContract({
-    address: arcAddrs.usdc,
-    abi: Erc20Abi,
-    functionName: "balanceOf",
-    args: address ? [address] : undefined,
-    chainId: arcTestnet.id,
-    query: { enabled: isConnected },
-  });
-
-  const hasGas = Boolean(sepoliaEth && sepoliaEth.value > 0n);
-  const hasSepoliaUsdc = Boolean(quotedPrice && sepoliaUsdc !== undefined && (sepoliaUsdc as bigint) >= quotedPrice);
-  const hasArcUsdc = Boolean(arcUsdc && (arcUsdc as bigint) > 0n);
-
-  // ---- 3. reserve (beginOrg) ------------------------------------------------------------------
-  interface Reservation {
-    commitment: Hex;
-    registrar: Address;
-    orgRootRegistry: Address;
-    orgRootNode: Hex;
-    committedAt: number;
-  }
+  // ---- resume state -------------------------------------------------------------------------
   const [reservation, setReservation] = useState<Reservation | null>(null);
-  const [reserveError, setReserveError] = useState<string | undefined>();
-  const { writeContractAsync: writeBeginOrg, isPending: reserving } = useWriteContract();
-
-  const { data: minCommitmentAge } = useReadContract({
-    address: sepoliaAddrs.ethRegistrar,
-    abi: ETHRegistrarAbi,
-    functionName: "MIN_COMMITMENT_AGE",
-    chainId: sepolia.id,
-  });
-  const { data: maxCommitmentAge } = useReadContract({
-    address: sepoliaAddrs.ethRegistrar,
-    abi: ETHRegistrarAbi,
-    functionName: "MAX_COMMITMENT_AGE",
-    chainId: sepolia.id,
-  });
-
-  async function handleReserve() {
-    if (!orgFactory || !address || !publicClient) return;
-    setReserveError(undefined);
-    try {
-      const secretSalt = crypto.getRandomValues(new Uint8Array(32));
-      const secretSaltHex = `0x${Array.from(secretSalt).map((b) => b.toString(16).padStart(2, "0")).join("")}` as Hex;
-
-      const hash = await writeBeginOrg({
-        address: orgFactory,
-        abi: MandateOrgFactoryAbi,
-        functionName: "beginOrg",
-        args: [label, address, secretSaltHex],
-        chainId: sepolia.id,
-      });
-      const receipt = await publicClient.waitForTransactionReceipt({ hash });
-      const [event] = parseEventLogs({
-        abi: MandateOrgFactoryAbi,
-        eventName: "OrgCommitted",
-        logs: receipt.logs,
-      });
-      if (!event) throw new Error("OrgCommitted event not found in receipt — reservation may have failed.");
-      const block = await publicClient.getBlock({ blockNumber: receipt.blockNumber });
-      setReservation({
-        commitment: event.args.commitment,
-        registrar: event.args.registrar,
-        orgRootRegistry: event.args.orgRootRegistry,
-        orgRootNode: event.args.orgRootNode,
-        committedAt: Number(block.timestamp),
-      });
-    } catch (err) {
-      setReserveError(err instanceof Error ? err.message : String(err));
-    }
-  }
-
-  // Live countdown, re-rendered every second while a reservation is pending.
-  const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
   useEffect(() => {
-    if (!reservation) return;
-    const id = setInterval(() => setNow(Math.floor(Date.now() / 1000)), 1000);
-    return () => clearInterval(id);
-  }, [reservation]);
-
-  const elapsedSinceCommit = reservation ? now - reservation.committedAt : 0;
-  const canFinalize = reservation && minCommitmentAge !== undefined && elapsedSinceCommit >= Number(minCommitmentAge);
-  const expiresIn =
-    reservation && maxCommitmentAge !== undefined ? Number(maxCommitmentAge) - elapsedSinceCommit : undefined;
-  const reservationExpired = expiresIn !== undefined && expiresIn <= 0;
-
-  // ---- 4. finalize (approve + finalizeOrg) -----------------------------------------------------
-  interface CreatedOrg {
-    registrar: Address;
-    orgEnsName: string;
-    pricePaid: bigint;
-  }
-  const [createdOrg, setCreatedOrg] = useState<CreatedOrg | null>(null);
-  const [finalizeError, setFinalizeError] = useState<string | undefined>();
-  const { writeContractAsync: writeApprove } = useWriteContract();
-  const { writeContractAsync: writeFinalize, isPending: finalizing } = useWriteContract();
-
-  async function handleFinalize() {
-    if (!reservation || !orgFactory || !quotedPrice || !publicClient) return;
-    setFinalizeError(undefined);
+    const key = storageKey(address);
+    if (!key) return;
     try {
-      const approveHash = await writeApprove({
-        address: sepoliaAddrs.usdc,
-        abi: Erc20Abi,
-        functionName: "approve",
-        args: [orgFactory, quotedPrice],
-        chainId: sepolia.id,
-      });
-      await publicClient.waitForTransactionReceipt({ hash: approveHash });
-
-      const finalizeHash = await writeFinalize({
-        address: orgFactory,
-        abi: MandateOrgFactoryAbi,
-        functionName: "finalizeOrg",
-        args: [reservation.commitment],
-        chainId: sepolia.id,
-      });
-      const receipt = await publicClient.waitForTransactionReceipt({ hash: finalizeHash });
-      const [event] = parseEventLogs({ abi: MandateOrgFactoryAbi, eventName: "OrgCreated", logs: receipt.logs });
-      if (!event) throw new Error("OrgCreated event not found in receipt.");
-      setCreatedOrg({
-        registrar: event.args.registrar,
-        orgEnsName: event.args.orgEnsName,
-        pricePaid: event.args.pricePaid,
-      });
-    } catch (err) {
-      setFinalizeError(err instanceof Error ? err.message : String(err));
+      const raw = localStorage.getItem(key);
+      setReservation(raw ? (JSON.parse(raw) as Reservation) : null);
+    } catch {
+      setReservation(null);
     }
-  }
+  }, [address]);
 
-  // ---- 5. Arc vault -----------------------------------------------------------------------------
-  const [enforcerAddress, setEnforcerAddress] = useState(process.env.NEXT_PUBLIC_ENFORCER_ADDRESS ?? "");
-  const [vaultError, setVaultError] = useState<string | undefined>();
-  const [vaultCreated, setVaultCreated] = useState(false);
-  const { writeContractAsync: writeCreateVault, isPending: creatingVault } = useWriteContract();
+  const persistReservation = useCallback(
+    (r: Reservation | null) => {
+      const key = storageKey(address);
+      if (!key) return;
+      try {
+        if (r) localStorage.setItem(key, JSON.stringify(r));
+        else localStorage.removeItem(key);
+      } catch {
+        /* private mode — in-memory state still carries the flow */
+      }
+      setReservation(r);
+    },
+    [address],
+  );
 
-  async function handleCreateVault() {
-    if (!vaultFactory || !address || !reservation || !arcPublicClient) return;
-    setVaultError(undefined);
-    try {
-      if (chainId !== arcTestnet.id) await switchChainAsync({ chainId: arcTestnet.id });
-      const hash = await writeCreateVault({
-        address: vaultFactory,
-        abi: ArcVaultFactoryAbi,
-        functionName: "createVaultFor",
-        args: [address, enforcerAddress as Address, reservation.orgRootNode],
-        chainId: arcTestnet.id,
-      });
-      await arcPublicClient.waitForTransactionReceipt({ hash });
-      setVaultCreated(true);
-    } catch (err) {
-      setVaultError(err instanceof Error ? err.message : String(err));
+  // ---- what's already on-chain for this admin -----------------------------------------------
+  const { orgs } = useOrgs();
+  const myOrg = useMemo(() => {
+    if (!address) return undefined;
+    const mine = orgs.filter((o) => o.admin.toLowerCase() === address.toLowerCase());
+    return mine.length > 0 ? mine[mine.length - 1] : undefined;
+  }, [orgs, address]);
+
+  const { nodes: mandateNodes } = useMandateGraph(myOrg?.registrar, myOrg?.createdAtBlock);
+  const agentIssued = mandateNodes.length > 0;
+
+  // Once the org is confirmed by its own OrgCreated log, the local commit secret is dead weight.
+  useEffect(() => {
+    if (myOrg && reservation) persistReservation(null);
+  }, [myOrg, reservation, persistReservation]);
+
+  // ---- step derivation --------------------------------------------------------------------
+  const [preReserveStep, setPreReserveStep] = useState<"name" | "fund">("name");
+
+  const step: StepId = useMemo(() => {
+    if (!isConnected) return "connect";
+    if (myOrg && agentIssued) return "agent"; // terminal; effect below redirects
+    if (myOrg && myOrg.vault) return "agent";
+    if (myOrg) return "vault";
+    if (reservation) return "register";
+    return preReserveStep;
+  }, [isConnected, myOrg, agentIssued, reservation, preReserveStep]);
+
+  const activeIndex = TIMELINE.findIndex((s) => s.id === step);
+
+  useEffect(() => {
+    if (myOrg && myOrg.vault && agentIssued) {
+      router.replace(`/org/${encodeURIComponent(myOrg.orgEnsName)}`);
     }
-  }
+  }, [myOrg, agentIssued, router]);
 
-  const orgEnsName = createdOrg?.orgEnsName;
-
-  return (
-    <div className="mx-auto max-w-2xl px-6 py-10 sm:py-14">
-      <Eyebrow>Self-serve onboarding</Eyebrow>
-      <Display as="h1" size="sm" className="mt-2">
-        Create your organisation
-      </Display>
-      <Lede className="mt-3">
-        Two signatures, one approval, and one unavoidable wait — ENSv2&rsquo;s own commit-reveal.
-        Nobody touches Foundry. When this finishes, the connected wallet owns a registry nobody
-        else, including this site, can issue mandates under.
-      </Lede>
-
-      {!orgFactory ? (
-        <Card padding="lg" className="mt-8 border-dashed text-center">
-          <p className="text-[14px] font-medium text-primary">Org factory not configured</p>
+  if (!orgFactory) {
+    return (
+      <Shell activeIndex={0}>
+        <Card padding="lg" className="border-dashed text-center">
+          <p className="text-[14px] font-medium text-primary">Platform not configured</p>
           <p className="mt-2 text-[13px] text-tertiary">
-            Set <code className="rounded bg-surface-2 px-1.5 py-0.5 font-mono">NEXT_PUBLIC_MANDATE_ORG_FACTORY</code>{" "}
-            once <code className="rounded bg-surface-2 px-1.5 py-0.5 font-mono">DeployFactories.s.sol</code> has run.
+            <code className="rounded bg-surface-2 px-1.5 py-0.5 font-mono">NEXT_PUBLIC_MANDATE_ORG_FACTORY</code> is unset.
           </p>
         </Card>
-      ) : (
-        <div className="mt-8 flex flex-col gap-5">
-          {/* Step 1 — connect */}
-          <Card padding="lg">
-            <RuleLabel>1 · Connect</RuleLabel>
-            <div className="mt-4 flex items-center justify-between gap-4">
-              {isConnected ? (
-                <MonoValue value={address!} className="text-secondary" />
-              ) : (
-                <p className="text-[13px] text-tertiary">Sign in to reserve a name with this wallet.</p>
-              )}
-              <ConnectButton />
-            </div>
+      </Shell>
+    );
+  }
+
+  return (
+    <Shell activeIndex={activeIndex}>
+      {step === "connect" ? <ConnectStep /> : null}
+      {step === "name" ? (
+        <NameStep
+          registrar={sepoliaAddrs.ethRegistrar}
+          usdc={sepoliaAddrs.usdc}
+          onContinue={() => setPreReserveStep("fund")}
+        />
+      ) : null}
+      {step === "fund" ? (
+        <FundStep
+          address={address!}
+          sepoliaUsdc={sepoliaAddrs.usdc}
+          arcUsdc={arcAddrs.usdc}
+          registrar={sepoliaAddrs.ethRegistrar}
+          orgFactory={orgFactory}
+          onBack={() => setPreReserveStep("name")}
+          onReserved={persistReservation}
+        />
+      ) : null}
+      {step === "register" && reservation ? (
+        <RegisterStep
+          reservation={reservation}
+          orgFactory={orgFactory}
+          usdc={sepoliaAddrs.usdc}
+          registrar={sepoliaAddrs.ethRegistrar}
+        />
+      ) : null}
+      {step === "vault" && myOrg ? (
+        <VaultStep
+          org={myOrg}
+          vaultFactory={vaultFactory}
+          enforcer={(process.env.NEXT_PUBLIC_ENFORCER_ADDRESS ?? "") as Address}
+          currentChainId={chainId}
+          switchChain={switchChainAsync}
+          arcClient={arcClient}
+        />
+      ) : null}
+      {step === "agent" && myOrg && myOrg.vault ? (
+        <div>
+          <Display as="h1" size="sm">Register your first agent</Display>
+          <p className="mt-2 text-[13px] text-secondary">One signature. The agent&rsquo;s wallet is created for you.</p>
+          <Card padding="lg" className="mt-6">
+            <RegisterAgentForm org={myOrg} submitLabel="Register agent" onDone={() => { /* redirect fires from the graph effect */ }} />
           </Card>
-
-          {/* Step 2 — name */}
-          <Card padding="lg" className={!isConnected ? "opacity-50" : ""}>
-            <RuleLabel>2 · Choose a name</RuleLabel>
-            <div className="mt-4">
-              <Field label="Label" hint="Lowercase letters, digits, hyphens — becomes label.eth">
-                <div className="flex items-center gap-2">
-                  <Input
-                    value={label}
-                    onChange={(e) => setLabel(e.target.value.toLowerCase())}
-                    placeholder="acme"
-                    disabled={!isConnected || Boolean(reservation)}
-                  />
-                  <span className="shrink-0 font-mono text-[13px] text-tertiary">.eth</span>
-                </div>
-              </Field>
-              {labelValid ? (
-                <p className="mt-2 text-[12px]">
-                  {checkingAvailability ? (
-                    <span className="text-tertiary">checking…</span>
-                  ) : isAvailable ? (
-                    <span className="text-live">
-                      available{quotedPrice ? ` — ${fromErc20Usdc(quotedPrice)} USDC for 28 days` : ""}
-                    </span>
-                  ) : (
-                    <span className="text-revoked">taken</span>
-                  )}
-                </p>
-              ) : label.length > 0 ? (
-                <p className="mt-2 text-[12px] text-revoked-strong">3-63 lowercase letters, digits, or hyphens</p>
-              ) : null}
-            </div>
-          </Card>
-
-          {/* Step 3 — preflight */}
-          {labelValid && isAvailable && !reservation ? (
-            <Card padding="lg">
-              <RuleLabel>3 · Preflight</RuleLabel>
-              <p className="mt-2 text-[12px] text-tertiary">
-                Nothing here is minted by this site — every balance and every payment is real,
-                including Sepolia USDC: Circle's real testnet token, confirmed accepted by ENSv2's
-                own registrar, not a token only this site can produce.
-              </p>
-              <div className="mt-4 flex flex-col gap-2.5">
-                <PreflightRow
-                  ok={hasGas}
-                  label="Sepolia ETH"
-                  hint="gas for two transactions"
-                  action={
-                    <a
-                      href="https://sepoliafaucet.com"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-[12px] text-accent hover:underline"
-                    >
-                      faucet →
-                    </a>
-                  }
-                />
-                <PreflightRow
-                  ok={hasSepoliaUsdc}
-                  label="Sepolia USDC"
-                  hint={quotedPrice ? `${fromErc20Usdc(quotedPrice)} USDC needed` : "checking price…"}
-                  action={
-                    <a
-                      href="https://faucet.circle.com"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-[12px] text-accent hover:underline"
-                    >
-                      faucet →
-                    </a>
-                  }
-                />
-                <PreflightRow
-                  ok={hasArcUsdc}
-                  label="Arc USDC"
-                  hint="gas + treasury funding, needed later"
-                  action={
-                    <a
-                      href="https://faucet.circle.com"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-[12px] text-accent hover:underline"
-                    >
-                      faucet →
-                    </a>
-                  }
-                />
-              </div>
-              <div className="mt-5">
-                <Button onClick={handleReserve} disabled={!hasGas || !hasSepoliaUsdc || reserving}>
-                  {reserving ? "Reserving…" : "Reserve this name"}
-                </Button>
-                {reserveError ? <p className="mt-2 text-[12px] text-revoked-strong">{reserveError}</p> : null}
-              </div>
-            </Card>
-          ) : null}
-
-          {/* Step 4 — reveal wait + finalize */}
-          {reservation && !createdOrg ? (
-            <Card padding="lg">
-              <RuleLabel>4 · Create organisation</RuleLabel>
-              <p className="mt-3 text-[13px] text-secondary">
-                Reserved. ENSv2&rsquo;s own commit-reveal requires a real wait before this can be
-                revealed — it reads as deliberate, not slow.
-              </p>
-              <div className="mt-4 flex items-center gap-3">
-                <span className={`h-2 w-2 rounded-full ${canFinalize ? "bg-live" : "bg-expiring animate-pulse-live"}`} />
-                <span className="font-mono text-[13px] tnum text-primary">
-                  {canFinalize
-                    ? "Ready"
-                    : `${Math.max(0, Number(minCommitmentAge ?? 60n) - elapsedSinceCommit)}s remaining`}
-                </span>
-              </div>
-              {reservationExpired ? (
-                <p className="mt-3 text-[12px] text-revoked-strong">
-                  This reservation has expired (24h commit window elapsed). Reserve the name again.
-                </p>
-              ) : expiresIn !== undefined && expiresIn < 3600 ? (
-                <p className="mt-2 text-[11px] text-expiring">
-                  Expires in {Math.floor(expiresIn / 60)}m — don&rsquo;t leave this tab idle much longer.
-                </p>
-              ) : null}
-              <div className="mt-5">
-                <Button onClick={handleFinalize} disabled={!canFinalize || reservationExpired || finalizing}>
-                  {finalizing ? "Creating…" : "Create organisation"}
-                </Button>
-                {finalizeError ? <p className="mt-2 text-[12px] text-revoked-strong">{finalizeError}</p> : null}
-              </div>
-            </Card>
-          ) : null}
-
-          {/* Step 5 — Arc vault */}
-          {createdOrg && !vaultCreated ? (
-            <Card padding="lg">
-              <RuleLabel>5 · Create your Arc vault</RuleLabel>
-              <p className="mt-3 text-[13px] text-secondary">
-                {createdOrg.orgEnsName} is live on Sepolia. Now deploy its own money-plane
-                anchor and treasury on Arc, signed for by an Enforcer key.
-              </p>
-              <div className="mt-4">
-                <Field label="Enforcer address" hint="The platform default works unless you're running your own">
-                  <Input
-                    mono
-                    value={enforcerAddress}
-                    onChange={(e) => setEnforcerAddress(e.target.value)}
-                    placeholder="0x…"
-                  />
-                </Field>
-              </div>
-              <div className="mt-5">
-                <Button onClick={handleCreateVault} disabled={!vaultFactory || creatingVault}>
-                  {creatingVault ? "Creating vault…" : "Create vault on Arc"}
-                </Button>
-                {!vaultFactory ? (
-                  <p className="mt-2 text-[12px] text-tertiary">
-                    Vault factory not configured — you can add this later from the org page.
-                  </p>
-                ) : null}
-                {vaultError ? <p className="mt-2 text-[12px] text-revoked-strong">{vaultError}</p> : null}
-              </div>
-            </Card>
-          ) : null}
-
-          {/* Done */}
-          {createdOrg && (vaultCreated || !vaultFactory) ? (
-            <Card padding="lg" className="border-live/30 bg-live-subtle">
-              <p className="text-[14px] font-medium text-primary">{createdOrg.orgEnsName} is live</p>
-              <p className="mt-2 text-[13px] text-secondary">
-                Issue its first mandate, fund the treasury, and watch it in the tree.
-              </p>
-              <div className="mt-4">
-                <Button onClick={() => router.push(`/org/${orgEnsName}`)}>Go to {orgEnsName} →</Button>
-              </div>
-            </Card>
-          ) : null}
         </div>
-      )}
+      ) : null}
+    </Shell>
+  );
+}
+
+function Shell({ activeIndex, children }: { activeIndex: number; children: React.ReactNode }) {
+  return (
+    <div className="mx-auto max-w-2xl px-6 py-10 sm:py-14">
+      <Eyebrow>Set up MANDATE</Eyebrow>
+      <div className="mt-6 overflow-x-auto">
+        <StepTimeline steps={TIMELINE} activeIndex={activeIndex < 0 ? 0 : activeIndex} />
+      </div>
+      <div className="mt-10">{children}</div>
     </div>
   );
 }
 
-function PreflightRow({
-  ok,
-  label,
-  hint,
-  action,
+// -------------------------------------------------------------------------------------------
+// Steps
+// -------------------------------------------------------------------------------------------
+
+function ConnectStep() {
+  return (
+    <div>
+      <Display as="h1" size="sm">Connect a wallet</Display>
+      <p className="mt-2 text-[13px] text-secondary">This wallet becomes the org admin — the only one that can issue or revoke mandates.</p>
+      <div className="mt-6">
+        <ConnectButton />
+      </div>
+    </div>
+  );
+}
+
+function NameStep({
+  registrar,
+  usdc,
+  onContinue,
 }: {
-  ok: boolean;
-  label: string;
-  hint: string;
-  action: React.ReactNode;
+  registrar: Address;
+  usdc: Address;
+  onContinue: () => void;
 }) {
+  const [label, setLabel] = useState("");
+  const valid = LABEL_RE.test(label);
+  const { data: available, isLoading: checking } = useReadContract({
+    address: registrar,
+    abi: ETHRegistrarAbi,
+    functionName: "isAvailable",
+    args: [label],
+    chainId: sepolia.id,
+    query: { enabled: valid },
+  });
+  const { data: price } = useReadContract({
+    address: registrar,
+    abi: ETHRegistrarAbi,
+    functionName: "getRegisterPrice",
+    args: [label, REGISTRATION_DURATION, usdc],
+    chainId: sepolia.id,
+    query: { enabled: valid && available === true },
+  });
+
+  // The typed label isn't persisted — nothing is on-chain yet — so hand it to the next step via
+  // sessionStorage so a mid-flow refresh on the fund step still knows which name to reserve.
+  useEffect(() => {
+    if (valid && available) sessionStorage.setItem("mandate:onboard:label", label);
+  }, [valid, available, label]);
+
+  return (
+    <div>
+      <Display as="h1" size="sm">Name your organisation</Display>
+      <p className="mt-2 text-[13px] text-secondary">A real ENS name. Your agents are subnames of it.</p>
+      <Card padding="lg" className="mt-6">
+        <Field label="Name" hint="Lowercase letters, digits, hyphens">
+          <div className="flex items-center gap-2">
+            <Input value={label} onChange={(e) => setLabel(e.target.value.toLowerCase())} placeholder="acme" autoFocus />
+            <span className="shrink-0 font-mono text-[13px] text-tertiary">.eth</span>
+          </div>
+        </Field>
+        {valid ? (
+          <p className="mt-2 text-[12px]">
+            {checking ? (
+              <span className="text-tertiary">checking…</span>
+            ) : available ? (
+              <span className="text-live">available{price ? ` — ${fromErc20Usdc(price)} USDC / 28 days` : ""}</span>
+            ) : (
+              <span className="text-revoked">taken</span>
+            )}
+          </p>
+        ) : label.length > 0 ? (
+          <p className="mt-2 text-[12px] text-revoked-strong">3–63 lowercase letters, digits, or hyphens</p>
+        ) : null}
+        <div className="mt-5">
+          <Button onClick={onContinue} disabled={!valid || available !== true}>
+            Continue
+          </Button>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+function FundStep({
+  address,
+  sepoliaUsdc,
+  arcUsdc,
+  registrar,
+  orgFactory,
+  onBack,
+  onReserved,
+}: {
+  address: Address;
+  sepoliaUsdc: Address;
+  arcUsdc: Address;
+  registrar: Address;
+  orgFactory: Address;
+  onBack: () => void;
+  onReserved: (r: Reservation) => void;
+}) {
+  const label = typeof window !== "undefined" ? sessionStorage.getItem("mandate:onboard:label") ?? "" : "";
+  const sepoliaClient = usePublicClient({ chainId: sepolia.id });
+
+  const { data: eth } = useBalance({ address, chainId: sepolia.id });
+  const { data: usdcBal } = useReadContract({
+    address: sepoliaUsdc,
+    abi: Erc20Abi,
+    functionName: "balanceOf",
+    args: [address],
+    chainId: sepolia.id,
+  });
+  const { data: arcBal } = useReadContract({
+    address: arcUsdc,
+    abi: Erc20Abi,
+    functionName: "balanceOf",
+    args: [address],
+    chainId: arcTestnet.id,
+  });
+  const { data: price } = useReadContract({
+    address: registrar,
+    abi: ETHRegistrarAbi,
+    functionName: "getRegisterPrice",
+    args: [label, REGISTRATION_DURATION, sepoliaUsdc],
+    chainId: sepolia.id,
+    query: { enabled: LABEL_RE.test(label) },
+  });
+
+  const hasGas = Boolean(eth && eth.value > 0n);
+  const hasUsdc = Boolean(price !== undefined && usdcBal !== undefined && (usdcBal as bigint) >= price);
+  const hasArc = Boolean(arcBal !== undefined && (arcBal as bigint) > 0n);
+  const ready = hasGas && hasUsdc && hasArc && LABEL_RE.test(label);
+
+  const { writeContractAsync, isPending } = useWriteContract();
+  const [error, setError] = useState<string | undefined>();
+
+  async function reserve() {
+    setError(undefined);
+    if (!sepoliaClient) return;
+    try {
+      const salt = crypto.getRandomValues(new Uint8Array(32));
+      const saltHex = `0x${Array.from(salt).map((b) => b.toString(16).padStart(2, "0")).join("")}` as Hex;
+      const hash = await writeContractAsync({
+        address: orgFactory,
+        abi: MandateOrgFactoryAbi,
+        functionName: "beginOrg",
+        args: [label, address, saltHex],
+        chainId: sepolia.id,
+      });
+      const receipt = await sepoliaClient.waitForTransactionReceipt({ hash });
+      const [event] = parseEventLogs({ abi: MandateOrgFactoryAbi, eventName: "OrgCommitted", logs: receipt.logs });
+      if (!event) throw new Error("Reservation didn't confirm — try again.");
+      const block = await sepoliaClient.getBlock({ blockNumber: receipt.blockNumber });
+      onReserved({
+        commitment: event.args.commitment,
+        orgRootNode: event.args.orgRootNode,
+        committedAt: Number(block.timestamp),
+        label,
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  return (
+    <div>
+      <Display as="h1" size="sm">Add funds</Display>
+      <p className="mt-2 text-[13px] text-secondary">
+        Testnet only. {label ? <span className="font-mono">{label}.eth</span> : "Your name"} needs a one-off USDC fee; both chains need a little gas.
+      </p>
+      <Card padding="lg" className="mt-6 flex flex-col gap-2.5">
+        <FundRow ok={hasGas} label="Sepolia ETH" hint="gas" href="https://sepoliafaucet.com" />
+        <FundRow
+          ok={hasUsdc}
+          label="Sepolia USDC"
+          hint={price !== undefined ? `${fromErc20Usdc(price)} needed` : "checking price…"}
+          href="https://faucet.circle.com"
+        />
+        <FundRow ok={hasArc} label="Arc USDC" hint="gas + treasury" href="https://faucet.circle.com" />
+      </Card>
+      <div className="mt-5 flex items-center gap-3">
+        <Button onClick={reserve} disabled={!ready || isPending}>
+          {isPending ? "Reserving…" : "Reserve name"}
+        </Button>
+        <button type="button" onClick={onBack} className="text-[12px] text-tertiary hover:text-secondary">
+          ← Back
+        </button>
+      </div>
+      {!label ? <p className="mt-2 text-[12px] text-expiring">Go back and pick a name first.</p> : null}
+      {error ? <p className="mt-2 text-[12px] text-revoked-strong">{error}</p> : null}
+    </div>
+  );
+}
+
+function FundRow({ ok, label, hint, href }: { ok: boolean; label: string; hint: string; href: string }) {
   return (
     <div className="flex items-center justify-between gap-4 rounded-lg border border-border-subtle bg-surface-2 px-3.5 py-2.5">
       <div className="flex items-center gap-2.5">
@@ -478,7 +416,152 @@ function PreflightRow({
           <p className="text-[11px] text-tertiary">{hint}</p>
         </div>
       </div>
-      {action}
+      <a href={href} target="_blank" rel="noreferrer" className="text-[12px] text-accent hover:underline">
+        faucet →
+      </a>
+    </div>
+  );
+}
+
+function RegisterStep({
+  reservation,
+  orgFactory,
+  usdc,
+  registrar,
+}: {
+  reservation: Reservation;
+  orgFactory: Address;
+  usdc: Address;
+  registrar: Address;
+}) {
+  const sepoliaClient = usePublicClient({ chainId: sepolia.id });
+  const { data: minAge } = useReadContract({
+    address: registrar,
+    abi: ETHRegistrarAbi,
+    functionName: "MIN_COMMITMENT_AGE",
+    chainId: sepolia.id,
+  });
+
+  const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
+  useEffect(() => {
+    const id = setInterval(() => setNow(Math.floor(Date.now() / 1000)), 1000);
+    return () => clearInterval(id);
+  }, []);
+  const waited = now - reservation.committedAt;
+  const remaining = Math.max(0, Number(minAge ?? 60n) - waited);
+  const canRegister = remaining === 0 && minAge !== undefined;
+
+  const { writeContractAsync, isPending } = useWriteContract();
+  const [error, setError] = useState<string | undefined>();
+
+  async function register() {
+    setError(undefined);
+    if (!sepoliaClient) return;
+    try {
+      const approveHash = await writeContractAsync({
+        address: usdc,
+        abi: Erc20Abi,
+        functionName: "approve",
+        args: [orgFactory, maxUint256],
+        chainId: sepolia.id,
+      });
+      await sepoliaClient.waitForTransactionReceipt({ hash: approveHash });
+      const finalizeHash = await writeContractAsync({
+        address: orgFactory,
+        abi: MandateOrgFactoryAbi,
+        functionName: "finalizeOrg",
+        args: [reservation.commitment],
+        chainId: sepolia.id,
+      });
+      await sepoliaClient.waitForTransactionReceipt({ hash: finalizeHash });
+      // useOrgs' live watch picks up OrgCreated and advances the flow to the vault step.
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  return (
+    <div>
+      <Display as="h1" size="sm">Register on ENS</Display>
+      <p className="mt-2 text-[13px] text-secondary">
+        <span className="font-mono">{reservation.label}.eth</span> is reserved. ENS enforces a short wait before it can be claimed.
+      </p>
+      <Card padding="lg" className="mt-6">
+        <div className="flex items-center gap-3">
+          <span className={`h-2 w-2 rounded-full ${canRegister ? "bg-live" : "bg-expiring animate-pulse-live"}`} />
+          <span className="font-mono text-[13px] tnum text-primary">{canRegister ? "Ready" : `${remaining}s`}</span>
+        </div>
+        <div className="mt-5">
+          <Button onClick={register} disabled={!canRegister || isPending}>
+            {isPending ? "Registering…" : "Register — approve + claim"}
+          </Button>
+          {error ? <p className="mt-2 text-[12px] text-revoked-strong">{error}</p> : null}
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+function VaultStep({
+  org,
+  vaultFactory,
+  enforcer,
+  currentChainId,
+  switchChain,
+  arcClient,
+}: {
+  org: { orgEnsName: string; admin: Address; orgRootNode: Hex };
+  vaultFactory: Address | undefined;
+  enforcer: Address;
+  currentChainId?: number;
+  switchChain: (args: { chainId: number }) => Promise<unknown>;
+  arcClient: ReturnType<typeof usePublicClient>;
+}) {
+  const { writeContractAsync, isPending } = useWriteContract();
+  const [error, setError] = useState<string | undefined>();
+
+  async function create() {
+    setError(undefined);
+    if (!vaultFactory || !arcClient) return;
+    try {
+      if (currentChainId !== arcTestnet.id) await switchChain({ chainId: arcTestnet.id });
+      const hash = await writeContractAsync({
+        address: vaultFactory,
+        abi: ArcVaultFactoryAbi,
+        functionName: "createVaultFor",
+        args: [org.admin, enforcer, org.orgRootNode],
+        chainId: arcTestnet.id,
+      });
+      await arcClient.waitForTransactionReceipt({ hash });
+      // useOrgs' VaultCreated watch advances the flow to the agent step.
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  return (
+    <div>
+      <Display as="h1" size="sm">Create the Arc vault</Display>
+      <p className="mt-2 text-[13px] text-secondary">
+        <span className="font-mono">{org.orgEnsName}</span> is live on Sepolia. This deploys its treasury on Arc, where agents actually spend.
+      </p>
+      <Card padding="lg" className="mt-6">
+        {!vaultFactory ? (
+          <p className="text-[13px] text-revoked-strong">Vault factory not configured — set NEXT_PUBLIC_ARC_VAULT_FACTORY.</p>
+        ) : (
+          <>
+            <p className="flex items-center gap-1.5 text-[12px] text-tertiary">
+              enforcer <MonoValue value={enforcer} className="text-secondary" />
+            </p>
+            <div className="mt-4">
+              <Button onClick={create} disabled={isPending}>
+                {isPending ? "Creating…" : "Create vault on Arc"}
+              </Button>
+              {error ? <p className="mt-2 text-[12px] text-revoked-strong">{error}</p> : null}
+            </div>
+          </>
+        )}
+      </Card>
     </div>
   );
 }
