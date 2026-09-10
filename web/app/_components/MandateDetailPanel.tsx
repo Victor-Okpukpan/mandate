@@ -42,7 +42,9 @@ function RecordRow({ label, value, badge }: { label: string; value: string; badg
  * verification. "unset" (no id claimed yet) renders nothing, same as an empty record.
  */
 function IdentityBadge({ agentIdText, agentWallet }: { agentIdText: string; agentWallet?: `0x${string}` }) {
-  const verification = useIdentityVerification(agentIdText || undefined, agentWallet);
+  // "" and "0" both mean "no ERC-8004 id claimed" — don't send either to the registry as a lookup.
+  const claimed = agentIdText && agentIdText !== "0" ? agentIdText : undefined;
+  const verification = useIdentityVerification(claimed, agentWallet);
   switch (verification.status) {
     case "unset":
       return null;
@@ -187,7 +189,7 @@ export function MandateDetailPanel({ node, state, addresses, onRevoke, revoking 
           <RecordRow
             key={r.key}
             label={r.key}
-            value={r.value}
+            value={r.key === BINDING_KEYS.erc8004Id && r.value === "0" ? "" : r.value}
             badge={
               r.key === BINDING_KEYS.erc8004Id ? (
                 <IdentityBadge agentIdText={r.value} agentWallet={agentWallet} />
@@ -240,22 +242,26 @@ export function MandateDetailPanel({ node, state, addresses, onRevoke, revoking 
 
       <RuleLabel>Money · Arc testnet</RuleLabel>
       <Plane eyebrow="MandateAnchor" title="Enforcement">
-        {anchor ? (
+        {/* An un-synced anchor reads back as a zero-filled tuple, not `undefined` — `updatedAt > 0`
+            is the real "has the Enforcer mirrored this to Arc yet" test. */}
+        {anchor && anchor[6] > 0n ? (
           <>
             <RecordRow label="revoked" value={anchor[8] ? "true" : "false"} />
-            <RecordRow label="updatedAt" value={anchor[6]?.toString() ?? ""} />
-            <RecordRow label="nonce" value={anchor[7]?.toString() ?? ""} />
+            <RecordRow label="updatedAt" value={anchor[6].toString()} />
+            <RecordRow label="nonce" value={anchor[7].toString()} />
           </>
         ) : (
-          <p className="py-3 text-[13px] text-tertiary">No Arc-side anchor yet — the Enforcer syncs
-            this after the mandate is issued.</p>
+          <p className="py-3 text-[13px] text-tertiary">
+            Not synced to Arc yet — the Enforcer mirrors this mandate onto the anchor the next time
+            it processes an event for this node.
+          </p>
         )}
       </Plane>
       <Plane eyebrow="AgentTreasury" title="Ledger">
         {account ? (
           <>
-            <RecordRow label="spentAccum" value={fromErc20Usdc(account[0])} />
-            <RecordRow label="principal" value={fromErc20Usdc(account[1])} />
+            <RecordRow label="spent (this window)" value={`$${fromErc20Usdc(account[0])}`} />
+            <RecordRow label="principal owed" value={`$${fromErc20Usdc(account[1])}`} />
           </>
         ) : (
           <p className="py-3 text-[13px] text-tertiary">No treasury account opened yet.</p>
