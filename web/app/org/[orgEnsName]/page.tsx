@@ -2,25 +2,33 @@
 
 import { use, useMemo, useState } from "react";
 import { motion } from "motion/react";
-import { useAccount, useWriteContract } from "wagmi";
-import { sepolia } from "viem/chains";
-import type { Hex } from "viem";
-import { MandateRegistrarAbi } from "@mandate/shared/abis";
+import { useAccount, usePublicClient, useReadContract, useWriteContract } from "wagmi";
+import { sepolia, arcTestnet } from "viem/chains";
+import { maxUint256, parseUnits, type Address, type Hex } from "viem";
+import { AgentTreasuryAbi, Erc20Abi, MandateRegistrarAbi } from "@mandate/shared/abis";
+import { fromErc20Usdc } from "@mandate/shared/decimals";
 import { Drawer } from "@mandate/ui/components/Drawer";
-import { Display, Eyebrow, Lede } from "@mandate/ui/components/Type";
+import { Display, Eyebrow, Lede, RuleLabel } from "@mandate/ui/components/Type";
 import { Stat } from "@mandate/ui/components/Stat";
 import { Card } from "@mandate/ui/components/Card";
+import { Button } from "@mandate/ui/components/Button";
+import { Input } from "@mandate/ui/components/Field";
+import { MonoValue } from "@mandate/ui/components/MonoValue";
 import { SkeletonRows } from "@mandate/ui/components/Skeleton";
 import { fadeUp } from "@mandate/ui/lib/motion";
 import type { OrgWithVault } from "@mandate/shared/orgs";
+import { getPublicArcAddresses } from "@/lib/publicNetworkAddresses";
 import { useSelectedOrg } from "@/lib/useSelectedOrg";
 import { mandateStateOf, useMandateGraph } from "@/lib/useMandateGraph";
 import { useMandateLabels } from "@/lib/useMandateLabels";
+import { usePaymentsFeed } from "@/lib/usePaymentsFeed";
 import { useAdversaryAttempts } from "@/lib/useAdversaryAttempts";
 import { useIsOrgAdmin } from "@/lib/useIsOrgAdmin";
 import { MandateTree } from "@/app/_components/MandateTree";
 import { MandateDetailPanel } from "@/app/_components/MandateDetailPanel";
 import { OrgNotFound } from "@/app/_components/OrgNotFound";
+
+const SHOW_ADVANCED = process.env.NEXT_PUBLIC_SHOW_ADVANCED === "true";
 
 /**
  * The org's own operations view — everything that used to live at `/` before orgs existed.
@@ -59,6 +67,118 @@ function AdversaryPanel() {
         </p>
       </Card>
     </motion.div>
+  );
+}
+
+/**
+ * Treasury balance + a Fund control, folded onto the dashboard so there's no separate page to
+ * visit just to see how much the org's agents can draw against. Funding is `approve` (max, once)
+ * then `deposit` on Arc — the org admin's own USDC.
+ */
+function TreasuryStrip({ treasury }: { treasury: Address }) {
+  const arcAddrs = getPublicArcAddresses();
+  const { address } = useAccount();
+  const arcClient = usePublicClient({ chainId: arcTestnet.id });
+  const { writeContractAsync, isPending } = useWriteContract();
+  const [amount, setAmount] = useState("");
+  const [open, setOpen] = useState(false);
+  const [error, setError] = useState<string | undefined>();
+
+  const { data: deposited, refetch: refetchDep } = useReadContract({
+    address: treasury,
+    abi: AgentTreasuryAbi,
+    functionName: "totalDeposited",
+    chainId: arcTestnet.id,
+  });
+  const { data: drawn } = useReadContract({
+    address: treasury,
+    abi: AgentTreasuryAbi,
+    functionName: "totalDrawn",
+    chainId: arcTestnet.id,
+  });
+
+  async function fund() {
+    setError(undefined);
+    if (!arcClient || !address) return;
+    try {
+      const value = parseUnits(amount || "0", 6);
+      if (value <= 0n) throw new Error("Enter an amount.");
+      const approveHash = await writeContractAsync({
+        address: arcAddrs.usdc,
+        abi: Erc20Abi,
+        functionName: "approve",
+        args: [treasury, maxUint256],
+        chainId: arcTestnet.id,
+      });
+      await arcClient.waitForTransactionReceipt({ hash: approveHash });
+      const depHash = await writeContractAsync({
+        address: treasury,
+        abi: AgentTreasuryAbi,
+        functionName: "deposit",
+        args: [value],
+        chainId: arcTestnet.id,
+      });
+      await arcClient.waitForTransactionReceipt({ hash: depHash });
+      setAmount("");
+      setOpen(false);
+      refetchDep();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  return (
+    <Card padding="lg">
+      <div className="flex flex-wrap items-center justify-between gap-6">
+        <div className="grid grid-cols-2 gap-8">
+          <Stat label="Treasury" value={fromErc20Usdc(deposited ?? 0n)} unit="USDC" />
+          <Stat label="Drawn" value={fromErc20Usdc(drawn ?? 0n)} unit="USDC" />
+        </div>
+        <Button variant="secondary" size="sm" onClick={() => setOpen((v) => !v)}>
+          {open ? "Cancel" : "Fund"}
+        </Button>
+      </div>
+      {open ? (
+        <div className="mt-4 flex items-end gap-3">
+          <Input mono type="number" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="100" />
+          <Button size="sm" onClick={fund} disabled={isPending}>
+            {isPending ? "Funding…" : "Deposit USDC"}
+          </Button>
+        </div>
+      ) : null}
+      {error ? <p className="mt-2 text-[12px] text-revoked-strong">{error}</p> : null}
+    </Card>
+  );
+}
+
+/** Every agent payment under this org, newest first — where a running agent's spends show up. */
+function PaymentsFeed({ treasury, fromBlock }: { treasury: Address; fromBlock: bigint }) {
+  const { rows, loading } = usePaymentsFeed(treasury, fromBlock);
+
+  return (
+    <Card padding="lg">
+      <RuleLabel>Agent payments</RuleLabel>
+      {loading ? (
+        <div className="mt-3">
+          <SkeletonRows rows={3} />
+        </div>
+      ) : rows.length === 0 ? (
+        <p className="mt-3 text-[13px] text-tertiary">No payments yet. An agent&rsquo;s spends land here live.</p>
+      ) : (
+        <div className="mt-3 divide-y divide-border-subtle border-t border-border-subtle">
+          {rows.slice(0, 20).map((r) => (
+            <div key={`${r.txHash}-${r.recipient}`} className="flex items-center justify-between gap-4 py-2.5 text-[13px]">
+              <div className="flex items-center gap-2 min-w-0">
+                <MonoValue value={r.agent} className="text-tertiary" />
+                <span className="text-disabled">→</span>
+                <MonoValue value={r.recipient} className="text-secondary" />
+              </div>
+              <span className="shrink-0 font-mono tnum text-primary">${fromErc20Usdc(r.amount)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
   );
 }
 
@@ -103,14 +223,11 @@ function OrgOverview({ org }: { org: OrgWithVault }) {
   return (
     <div className="mx-auto max-w-6xl px-6 py-10 sm:py-14">
       <motion.div variants={fadeUp} initial="hidden" animate="visible">
-        <Eyebrow>Authority plane · Sepolia</Eyebrow>
+        <Eyebrow>{org.orgEnsName}</Eyebrow>
         <Display as="h1" size="md" className="mt-2">
-          Every mandate, live.
+          Agents
         </Display>
-        <Lede className="mt-3">
-          Read directly from {org.orgEnsName}&rsquo;s own event log — nothing here is cached or
-          indexed. Select a row to see its ENS records, its Arc anchor, and what it&rsquo;s spent.
-        </Lede>
+        <Lede className="mt-3">Every mandate under {org.orgEnsName}. Select one to view or revoke it.</Lede>
       </motion.div>
 
       <motion.div
@@ -118,19 +235,19 @@ function OrgOverview({ org }: { org: OrgWithVault }) {
         initial="hidden"
         animate="visible"
         transition={{ delay: 0.06 }}
-        className="mt-10"
+        className="mt-10 grid gap-4 sm:grid-cols-2"
       >
+        <TreasuryStrip treasury={org.vault!.treasury} />
         <Card padding="lg">
-          <div className="grid grid-cols-2 gap-8 sm:grid-cols-4">
+          <div className="grid grid-cols-3 gap-6">
             <Stat label="Live" value={counts.live} />
-            <Stat label="Expiring" value={counts.expiring} />
             <Stat label="Revoked" value={counts.revoked} />
-            <Stat label="Total issued" value={nodes.length} />
+            <Stat label="Total" value={nodes.length} />
           </div>
         </Card>
       </motion.div>
 
-      <AdversaryPanel />
+      {SHOW_ADVANCED ? <AdversaryPanel /> : null}
 
       <motion.div
         variants={fadeUp}
@@ -144,10 +261,9 @@ function OrgOverview({ org }: { org: OrgWithVault }) {
             <SkeletonRows rows={5} />
           ) : nodes.length === 0 ? (
             <div className="py-12 text-center">
-              <p className="text-[14px] font-medium text-primary">No mandates issued yet</p>
+              <p className="text-[14px] font-medium text-primary">No agents yet</p>
               <p className="mt-2 text-[13px] text-tertiary">
-                {isConnected ? "Issue the first one from " : "Sign in and issue the first one from "}
-                <span className="font-mono text-secondary">mandate/new</span>.
+                {isConnected ? "Register one from the sidebar." : "Sign in with the admin wallet to register one."}
               </p>
             </div>
           ) : (
@@ -161,6 +277,16 @@ function OrgOverview({ org }: { org: OrgWithVault }) {
             />
           )}
         </Card>
+      </motion.div>
+
+      <motion.div
+        variants={fadeUp}
+        initial="hidden"
+        animate="visible"
+        transition={{ delay: 0.16 }}
+        className="mt-6"
+      >
+        <PaymentsFeed treasury={org.vault!.treasury} fromBlock={org.vault!.createdAtBlock} />
       </motion.div>
 
       <Drawer
