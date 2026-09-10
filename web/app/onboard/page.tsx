@@ -192,7 +192,11 @@ export default function OnboardPage() {
           <Display as="h1" size="sm">Register your first agent</Display>
           <p className="mt-2 text-[13px] text-secondary">One signature. The agent&rsquo;s wallet is created for you.</p>
           <Card padding="lg" className="mt-6">
-            <RegisterAgentForm org={myOrg} submitLabel="Register agent" onDone={() => { /* redirect fires from the graph effect */ }} />
+            <RegisterAgentForm
+              org={myOrg}
+              submitLabel="Register agent"
+              onDone={() => router.replace(`/org/${encodeURIComponent(myOrg.orgEnsName)}`)}
+            />
           </Card>
         </div>
       ) : null}
@@ -453,6 +457,7 @@ function RegisterStep({
 
   const { writeContractAsync, isPending } = useWriteContract();
   const [error, setError] = useState<string | undefined>();
+  const [finalized, setFinalized] = useState(false);
 
   async function register() {
     setError(undefined);
@@ -474,6 +479,7 @@ function RegisterStep({
         chainId: sepolia.id,
       });
       await sepoliaClient.waitForTransactionReceipt({ hash: finalizeHash });
+      setFinalized(true);
       // useOrgs' live watch picks up OrgCreated and advances the flow to the vault step.
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -492,9 +498,13 @@ function RegisterStep({
           <span className="font-mono text-[13px] tnum text-primary">{canRegister ? "Ready" : `${remaining}s`}</span>
         </div>
         <div className="mt-5">
-          <Button onClick={register} disabled={!canRegister || isPending}>
-            {isPending ? "Registering…" : "Register — approve + claim"}
-          </Button>
+          {finalized ? (
+            <p className="text-[13px] text-live">Registered — finishing…</p>
+          ) : (
+            <Button onClick={register} disabled={!canRegister || isPending}>
+              {isPending ? "Registering…" : "Register — approve + claim"}
+            </Button>
+          )}
           {error ? <p className="mt-2 text-[12px] text-revoked-strong">{error}</p> : null}
         </div>
       </Card>
