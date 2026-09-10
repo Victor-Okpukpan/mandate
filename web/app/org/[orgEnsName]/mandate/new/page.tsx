@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useMemo, useState } from "react";
+import { use, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useWaitForTransactionReceipt, useWriteContract } from "wagmi";
 import { sepolia } from "viem/chains";
@@ -124,6 +124,14 @@ function NewMandateForm({ org }: { org: OrgWithVault }) {
     hash: txHash,
     chainId: sepolia.id,
   });
+
+  // Once the mint tx is confirmed onchain, leave the composer automatically instead of making
+  // the admin click through — the link below stays as a manual fallback if navigation is slow.
+  useEffect(() => {
+    if (confirmed) {
+      router.push(`/org/${org.orgEnsName}`);
+    }
+  }, [confirmed, router, org.orgEnsName]);
 
   /**
    * The step that never existed anywhere in this repo: creating the agent's actual wallet. Calls
