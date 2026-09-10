@@ -266,7 +266,15 @@ function NewMandateForm({ org }: { org: OrgWithVault }) {
               ) : null}
 
               <div className="mt-4 grid grid-cols-1 gap-3">
-                <Field label="Address" required>
+                <Field
+                  label="Address"
+                  required
+                  hint={
+                    provisionedWalletId
+                      ? "Locked — this is the real Privy wallet just provisioned. Click “Provision another” to replace it, rather than editing the address by hand."
+                      : "Paste an existing wallet's address, or click “Provision a wallet” above to create one."
+                  }
+                >
                   <Input
                     mono
                     value={agentWallet}
@@ -276,6 +284,8 @@ function NewMandateForm({ org }: { org: OrgWithVault }) {
                     }}
                     placeholder="0x…"
                     required
+                    readOnly={Boolean(provisionedWalletId)}
+                    className={provisionedWalletId ? "cursor-not-allowed opacity-70" : undefined}
                   />
                 </Field>
                 <label className="flex items-center gap-2 text-[12px] text-secondary">
