@@ -1,7 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useAccount, useBalance, useReadContract, useSendTransaction, useWriteContract } from "wagmi";
+import {
+  useAccount,
+  useBalance,
+  useReadContract,
+  useSendTransaction,
+  useSwitchChain,
+  useWriteContract,
+} from "wagmi";
 import { sepolia, arcTestnet } from "viem/chains";
 import { formatUnits, parseUnits, type Address } from "viem";
 import { usePrivy } from "@privy-io/react-auth";
@@ -49,7 +56,12 @@ function SendForm({
 
   const { sendTransactionAsync, isPending: sendingNative } = useSendTransaction();
   const { writeContractAsync, isPending: sendingToken } = useWriteContract();
-  const sending = sendingNative || sendingToken;
+  const { switchChainAsync, isPending: switching } = useSwitchChain();
+  const { chainId: currentChainId } = useAccount();
+  const sending = sendingNative || sendingToken || switching;
+
+  const targetChainId = asset === "arcUsdc" ? arcTestnet.id : sepolia.id;
+  const wrongChain = currentChainId !== undefined && currentChainId !== targetChainId;
 
   const toValid = ADDRESS_RE.test(to);
   const decimals = asset === "sepoliaUsdc" ? 6 : 18;
@@ -71,11 +83,12 @@ function SendForm({
     setError(undefined);
     setTxHash(undefined);
     try {
-      if (asset === "sepoliaEth") {
-        const hash = await sendTransactionAsync({ to: to as Address, value: amountWei, chainId: sepolia.id });
-        setTxHash(hash);
-      } else if (asset === "arcUsdc") {
-        const hash = await sendTransactionAsync({ to: to as Address, value: amountWei, chainId: arcTestnet.id });
+      // Privy's embedded connector doesn't switch networks on its own when a write targets a
+      // different chain — it just rejects with "wrong chain". Do the switch here first.
+      if (wrongChain) await switchChainAsync({ chainId: targetChainId });
+
+      if (asset === "sepoliaEth" || asset === "arcUsdc") {
+        const hash = await sendTransactionAsync({ to: to as Address, value: amountWei, chainId: targetChainId });
         setTxHash(hash);
       } else {
         const hash = await writeContractAsync({
@@ -137,7 +150,7 @@ function SendForm({
           disabled={!toValid || !amountValid || sending}
           className="mt-1 w-full rounded-md bg-accent px-3 py-2 text-[13px] font-medium text-on-accent transition-colors hover:bg-accent-strong disabled:opacity-40"
         >
-          {sending ? "Sending…" : "Send"}
+          {switching ? "Switching network…" : sending ? "Sending…" : wrongChain ? `Switch to ${asset === "arcUsdc" ? "Arc" : "Sepolia"} & send` : "Send"}
         </button>
 
         {error ? <p className="text-[11px] text-revoked">{error}</p> : null}
@@ -257,7 +270,7 @@ export function WalletMenu() {
       </button>
 
       {open ? (
-        <div className="absolute right-0 top-full z-50 mt-2 w-72 rounded-xl border border-border-subtle bg-surface shadow-lg">
+        <div className="absolute right-0 top-full z-50 mt-2 w-84 max-w-[calc(100vw-1.5rem)] rounded-xl border border-border-subtle bg-surface shadow-lg">
           {sendAsset ? (
             <SendForm asset={sendAsset} balance={balanceForAsset[sendAsset]} sepoliaAddrs={sepoliaAddrs} onBack={handleBack} />
           ) : (

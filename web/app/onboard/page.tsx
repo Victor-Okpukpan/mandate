@@ -14,6 +14,7 @@ import { sepolia, arcTestnet } from "viem/chains";
 import { maxUint256, parseEventLogs, type Address, type Hex } from "viem";
 import { ArcVaultFactoryAbi, ETHRegistrarAbi, MandateOrgFactoryAbi, Erc20Abi } from "@mandate/shared/abis";
 import { fromErc20Usdc } from "@mandate/shared/decimals";
+import type { OrgWithVault } from "@mandate/shared/orgs";
 import { Button } from "@mandate/ui/components/Button";
 import { Card } from "@mandate/ui/components/Card";
 import { Field, Input } from "@mandate/ui/components/Field";
@@ -60,7 +61,7 @@ function storageKey(address?: string) {
  */
 export default function OnboardPage() {
   const router = useRouter();
-  const { address, isConnected, chainId } = useAccount();
+  const { address, chainId } = useAccount();
   const { switchChainAsync } = useSwitchChain();
   const sepoliaClient = usePublicClient({ chainId: sepolia.id });
   const arcClient = usePublicClient({ chainId: arcTestnet.id });
@@ -115,33 +116,44 @@ export default function OnboardPage() {
     return mine.length > 0 ? mine[mine.length - 1] : undefined;
   }, [orgs, address, ignoredRegistrars]);
 
-  const { nodes: mandateNodes } = useMandateGraph(myOrg?.registrar, myOrg?.createdAtBlock);
+  // `useOrgs` briefly returns [] while it re-backfills, and wagmi's `isConnected` flickers during
+  // Privy hydration — either would bounce the wizard back a step for a frame. Latch the org we've
+  // seen (respecting the ignore list) and gate on `address`, which is stable, so the step only
+  // ever moves forward on its own.
+  const [sawOrg, setSawOrg] = useState<OrgWithVault>();
+  useEffect(() => {
+    if (myOrg) setSawOrg(myOrg);
+  }, [myOrg]);
+  const org =
+    myOrg ??
+    (sawOrg && !ignoredRegistrars.includes(sawOrg.registrar.toLowerCase()) ? sawOrg : undefined);
+
+  const { nodes: mandateNodes } = useMandateGraph(org?.registrar, org?.createdAtBlock);
   const agentIssued = mandateNodes.length > 0;
 
   // Once the org is confirmed by its own OrgCreated log, the local commit secret is dead weight.
   useEffect(() => {
-    if (myOrg && reservation) persistReservation(null);
-  }, [myOrg, reservation, persistReservation]);
+    if (org && reservation) persistReservation(null);
+  }, [org, reservation, persistReservation]);
 
   // ---- step derivation --------------------------------------------------------------------
   const [preReserveStep, setPreReserveStep] = useState<"name" | "fund">("name");
 
   const step: StepId = useMemo(() => {
-    if (!isConnected) return "connect";
-    if (myOrg && agentIssued) return "agent"; // terminal; effect below redirects
-    if (myOrg && myOrg.vault) return "agent";
-    if (myOrg) return "vault";
+    if (!address) return "connect";
+    if (org && org.vault) return "agent";
+    if (org) return "vault";
     if (reservation) return "register";
     return preReserveStep;
-  }, [isConnected, myOrg, agentIssued, reservation, preReserveStep]);
+  }, [address, org, reservation, preReserveStep]);
 
   const activeIndex = TIMELINE.findIndex((s) => s.id === step);
 
   useEffect(() => {
-    if (myOrg && myOrg.vault && agentIssued) {
-      router.replace(`/org/${encodeURIComponent(myOrg.orgEnsName)}`);
+    if (org && org.vault && agentIssued) {
+      router.replace(`/org/${encodeURIComponent(org.orgEnsName)}`);
     }
-  }, [myOrg, agentIssued, router]);
+  }, [org, agentIssued, router]);
 
   if (!orgFactory) {
     return (
@@ -185,29 +197,30 @@ export default function OnboardPage() {
           registrar={sepoliaAddrs.ethRegistrar}
         />
       ) : null}
-      {step === "vault" && myOrg ? (
+      {step === "vault" && org ? (
         <VaultStep
-          org={myOrg}
+          org={org}
           vaultFactory={vaultFactory}
           enforcer={(process.env.NEXT_PUBLIC_ENFORCER_ADDRESS ?? "") as Address}
           currentChainId={chainId}
           switchChain={switchChainAsync}
           arcClient={arcClient}
           onStartFresh={() => {
-            setIgnoredRegistrars((prev) => [...prev, myOrg.registrar.toLowerCase()]);
+            setIgnoredRegistrars((prev) => [...prev, org.registrar.toLowerCase()]);
+            setSawOrg(undefined);
             setPreReserveStep("name");
           }}
         />
       ) : null}
-      {step === "agent" && myOrg && myOrg.vault ? (
+      {step === "agent" && org && org.vault ? (
         <div>
           <Display as="h1" size="sm">Register your first agent</Display>
           <p className="mt-2 text-[13px] text-secondary">One signature. The agent&rsquo;s wallet is created for you.</p>
           <Card padding="lg" className="mt-6">
             <RegisterAgentForm
-              org={myOrg}
+              org={org}
               submitLabel="Register agent"
-              onDone={() => router.replace(`/org/${encodeURIComponent(myOrg.orgEnsName)}`)}
+              onDone={() => router.replace(`/org/${encodeURIComponent(org.orgEnsName)}`)}
             />
           </Card>
         </div>
