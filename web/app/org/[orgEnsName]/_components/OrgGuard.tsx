@@ -15,9 +15,11 @@ export function OrgGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const params = useParams<{ orgEnsName: string }>();
   const orgEnsName = decodeURIComponent(params.orgEnsName);
-  const { org, loading, notFound } = useSelectedOrg(orgEnsName);
+  const { org, loading, notFound, vaultsConfirmed } = useSelectedOrg(orgEnsName);
 
-  const halfBuilt = Boolean(org && !org.vault);
+  // Only bounce when we're *sure* the vault is missing — a dropped Arc RPC read (public RPCs 429
+  // under load) must not look like an abandoned onboarding and loop the user back to the wizard.
+  const halfBuilt = Boolean(org && !org.vault && vaultsConfirmed);
 
   useEffect(() => {
     if (halfBuilt) router.replace("/onboard");

@@ -14,8 +14,10 @@ export function useSelectedOrg(orgEnsName: string): {
   org: OrgWithVault | undefined;
   loading: boolean;
   notFound: boolean;
+  /** A clean vault read landed — safe to treat a missing `org.vault` as "not set up". */
+  vaultsConfirmed: boolean;
 } {
-  const { orgs, loading } = useOrgs();
+  const { orgs, loading, vaultsConfirmed } = useOrgs();
   const org = orgs.find((o) => o.orgEnsName === orgEnsName);
-  return { org, loading, notFound: !loading && !org };
+  return { org, loading, notFound: !loading && !org, vaultsConfirmed };
 }
