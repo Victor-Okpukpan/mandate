@@ -89,10 +89,14 @@ function TreasuryStrip({ treasury, isAdmin }: { treasury: Address; isAdmin: bool
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | undefined>();
 
-  const { data: deposited, refetch: refetchDep } = useReadContract({
-    address: treasury,
-    abi: AgentTreasuryAbi,
-    functionName: "totalDeposited",
+  // The literal USDC balance sitting in the contract right now — not `totalDeposited`, which is a
+  // lifetime-deposits counter that a withdrawal (or a spend) never decrements. This is the number
+  // "Withdraw" and "Fund" actually change, and the only one that answers "how much is in there?".
+  const { data: available, refetch: refetchAvailable } = useReadContract({
+    address: arcAddrs.usdc,
+    abi: Erc20Abi,
+    functionName: "balanceOf",
+    args: [treasury],
     chainId: arcTestnet.id,
   });
   const { data: drawn, refetch: refetchDrawn } = useReadContract({
@@ -147,7 +151,7 @@ function TreasuryStrip({ treasury, isAdmin }: { treasury: Address; isAdmin: bool
       await arcClient.waitForTransactionReceipt({ hash: depHash });
       setAmount("");
       setMode(null);
-      refetchDep();
+      refetchAvailable();
     } catch (err) {
       setError(formatTxError(err));
     } finally {
@@ -180,7 +184,7 @@ function TreasuryStrip({ treasury, isAdmin }: { treasury: Address; isAdmin: bool
       await arcClient.waitForTransactionReceipt({ hash });
       setAmount("");
       setMode(null);
-      refetchDep();
+      refetchAvailable();
       refetchDrawn();
     } catch (err) {
       setError(formatTxError(err));
@@ -193,7 +197,7 @@ function TreasuryStrip({ treasury, isAdmin }: { treasury: Address; isAdmin: bool
     <Card padding="lg">
       <div className="flex flex-wrap items-center justify-between gap-6">
         <div className="grid grid-cols-2 gap-8">
-          <Stat label="Treasury" value={fromErc20Usdc(deposited ?? 0n)} unit="USDC" />
+          <Stat label="Available" value={fromErc20Usdc(available ?? 0n)} unit="USDC" />
           <Stat label="Drawn" value={fromErc20Usdc(drawn ?? 0n)} unit="USDC" />
         </div>
         <div className="flex items-center gap-2">
