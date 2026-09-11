@@ -31,6 +31,7 @@ async function main() {
         new PrivyClient({ appId: requireEnv("PRIVY_APP_ID"), appSecret: requireEnv("PRIVY_APP_SECRET") }),
         requireEnv("AGENT_PRIVY_WALLET_ID"),
         requireEnv("AGENT_ARC_WALLET_ADDRESS") as `0x${string}`,
+        clients.arc,
       );
 
   console.log(`[${ensName}] starting as ${role}, signing from ${signer.address}`);

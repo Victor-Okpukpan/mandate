@@ -43,6 +43,7 @@ async function main() {
         new PrivyClient({ appId: requireEnv("PRIVY_APP_ID"), appSecret: requireEnv("PRIVY_APP_SECRET") }),
         requireEnv("AGENT_PRIVY_WALLET_ID"),
         requireEnv("AGENT_ARC_WALLET_ADDRESS") as Address,
+        clients.arc,
       );
 
   // Resolve the agent's own mandate — live, same as read_my_mandate().
