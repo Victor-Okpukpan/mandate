@@ -9,6 +9,7 @@ import { ProductShot } from "./_components/ProductShot";
 import { PlaneFlow } from "./_components/PlaneFlow";
 import { ProofCard } from "./_components/ProofCard";
 import { MandateFlow } from "./_components/MandateFlow";
+import { FaqAccordion } from "./_components/FaqAccordion";
 import { Card } from "@mandate/ui/components/Card";
 import { Display, Eyebrow, Lede } from "@mandate/ui/components/Type";
 import { fadeUp, stagger, VIEWPORT } from "@mandate/ui/lib/motion";
@@ -385,22 +386,7 @@ export default function LandingPage() {
         <section className="py-24 sm:py-28">
           <div className="mx-auto max-w-3xl px-6">
             <SectionHeading>Common questions</SectionHeading>
-            <motion.div
-              variants={stagger(0.06)}
-              initial="hidden"
-              whileInView="visible"
-              viewport={VIEWPORT}
-              className="mt-10 divide-y divide-border-subtle border-t border-border-subtle"
-            >
-              {FAQ.map((item) => (
-                <motion.div key={item.question} variants={fadeUp} className="py-6">
-                  <h3 className="font-sans text-[17px] font-semibold tracking-tight text-primary">
-                    {item.question}
-                  </h3>
-                  <p className="mt-2 text-[14px] leading-relaxed text-secondary">{item.answer}</p>
-                </motion.div>
-              ))}
-            </motion.div>
+            <FaqAccordion items={FAQ} />
           </div>
         </section>
 
