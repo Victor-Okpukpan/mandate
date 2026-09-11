@@ -18,19 +18,35 @@ function WindowChrome({ url }: { url: string }) {
   );
 }
 
-function MandateRow({ name, state, budget }: { name: string; state: "live" | "revoked"; budget: string }) {
+/** Mirrors the real dashboard table's five columns (Name / State / Agent wallet / Budget /
+ *  Expires) exactly — see `web/app/_components/MandateTree.tsx` — not a simplified stand-in. */
+function MandateRow({
+  name,
+  state,
+  wallet,
+  budget,
+  expires,
+}: {
+  name: string;
+  state: "root" | "live" | "revoked";
+  wallet: string;
+  budget: string;
+  expires: string;
+}) {
   return (
-    <div className="flex items-center justify-between border-b border-border-subtle px-4 py-3 last:border-0">
-      <span className="font-mono text-[12px] text-primary">{name}</span>
-      <span
-        className={`inline-flex items-center gap-1.5 font-mono text-[11px] ${
-          state === "live" ? "text-live" : "text-revoked"
-        }`}
-      >
-        <span className={`h-1.5 w-1.5 rounded-full ${state === "live" ? "bg-live" : "bg-revoked"}`} />
-        {state === "live" ? "Live" : "Revoked"}
-      </span>
-      <span className="font-mono text-[11px] tabular-nums text-tertiary">{budget}</span>
+    <div className="grid grid-cols-[1.6fr_0.9fr_1.3fr_0.9fr_0.8fr] items-center gap-2 border-b border-border-subtle px-4 py-2.5 last:border-0">
+      <span className="truncate font-mono text-[12px] text-primary">{name}</span>
+      {state === "root" ? (
+        <span className="font-mono text-[10px] uppercase tracking-label text-tertiary">org root</span>
+      ) : (
+        <span className={`inline-flex items-center gap-1.5 font-mono text-[11px] ${state === "live" ? "text-live" : "text-revoked"}`}>
+          <span className={`h-1.5 w-1.5 rounded-full ${state === "live" ? "bg-live" : "bg-revoked"}`} />
+          {state === "live" ? "Live" : "Revoked"}
+        </span>
+      )}
+      <span className="truncate font-mono text-[11px] text-secondary">{wallet}</span>
+      <span className="font-mono text-[11px] tabular-nums text-secondary">{budget}</span>
+      <span className="font-mono text-[11px] tabular-nums text-tertiary">{expires}</span>
     </div>
   );
 }
@@ -60,8 +76,16 @@ export function ProductShot() {
           ))}
         </div>
         <div className="mt-1">
-          <MandateRow name="researcher.acme.eth" state="live" budget="$312 of $500" />
-          <MandateRow name="ops.acme.eth" state="revoked" budget="$0 of $500" />
+          <div className="grid grid-cols-[1.6fr_0.9fr_1.3fr_0.9fr_0.8fr] gap-2 border-b border-border-subtle px-4 pb-1.5">
+            {["Name", "State", "Agent wallet", "Budget", "Expires"].map((h) => (
+              <span key={h} className="font-mono text-[10px] uppercase tracking-label text-disabled">
+                {h}
+              </span>
+            ))}
+          </div>
+          <MandateRow name="acme.eth" state="root" wallet="—" budget="$500 committed" expires="—" />
+          <MandateRow name="researcher" state="live" wallet="0xA794…9EB0C9" budget="$500" expires="6d 23h" />
+          <MandateRow name="ops" state="revoked" wallet="0x6f2A…e3AD" budget="$500" expires="—" />
         </div>
         {/* Blank floor, not decorative filler — gives the front panel below somewhere to overlap
             that isn't a row of actual data. Without this the front card's top edge lands right on
