@@ -6,9 +6,9 @@ import { Nav } from "./_components/Nav";
 import { Footer } from "./_components/Footer";
 import { AnnouncementBar } from "./_components/AnnouncementBar";
 import { ProductShot } from "./_components/ProductShot";
-import { PlaneCard } from "./_components/PlaneCard";
+import { PlaneFlow } from "./_components/PlaneFlow";
 import { ProofCard } from "./_components/ProofCard";
-import { StepCard } from "./_components/StepCard";
+import { MandateFlow } from "./_components/MandateFlow";
 import { Card } from "@mandate/ui/components/Card";
 import { Display, Eyebrow, Lede } from "@mandate/ui/components/Type";
 import { fadeUp, stagger, VIEWPORT } from "@mandate/ui/lib/motion";
@@ -25,6 +25,11 @@ const FAQ: Array<{ question: string; answer: string }> = [
     question: "What is a spending mandate?",
     answer:
       "An ENS subname whose records are an AI agent's entire spending authority — budget, per-transaction cap, allowlisted recipients, and an expiry. The agent can read it. It cannot edit it.",
+  },
+  {
+    question: "Do you provide the AI agent?",
+    answer:
+      "No. MANDATE issues and enforces authority — the ENS record, the provisioned wallet, the synced policy. The agent doing the work is whatever you already run: an LLM loop, a cron job, your own stack. Bring your own agent; this is the seatbelt.",
   },
   {
     question: "How do you revoke an AI agent's spending power?",
@@ -188,41 +193,31 @@ export default function LandingPage() {
             >
               Three planes, one source of truth
             </SectionHeading>
-            <motion.div
-              variants={stagger(0.1)}
-              initial="hidden"
-              whileInView="visible"
-              viewport={VIEWPORT}
-              className="mt-12 grid gap-5 sm:grid-cols-3"
-            >
-              <motion.div variants={fadeUp}>
-                <PlaneCard
-                  index="01"
-                  chain="Sepolia"
-                  title="Authority"
-                  accentClass="bg-live"
-                  description="ENSv2 holds what each agent is allowed to do. Nothing else is authoritative — amending a mandate means writing an ENS record, on a name the org's own registry controls."
-                />
-              </motion.div>
-              <motion.div variants={fadeUp}>
-                <PlaneCard
-                  index="02"
-                  chain="Off-chain"
-                  title="Enforcement"
-                  accentClass="bg-accent"
-                  description="The Enforcer watches Sepolia and compiles each mandate into a Privy policy and a signed Arc anchor. A propagator, not an authority — it can only ever narrow, never widen."
-                />
-              </motion.div>
-              <motion.div variants={fadeUp}>
-                <PlaneCard
-                  index="03"
-                  chain="Arc"
-                  title="Money"
-                  accentClass="bg-expiring"
-                  description="Where value actually moves, checked against the anchor on every spend. Gas is USDC, settlement is deterministic, and the agent's own wallet holds almost nothing."
-                />
-              </motion.div>
-            </motion.div>
+            <PlaneFlow
+              nodes={[
+                {
+                  chain: "Sepolia",
+                  title: "Authority",
+                  accentClass: "bg-live",
+                  description:
+                    "ENSv2 holds what each agent is allowed to do. An org creates itself here too — a self-serve wizard runs the whole registration, no script or manual deploy per org.",
+                },
+                {
+                  chain: "Off-chain",
+                  title: "Enforcement",
+                  accentClass: "bg-accent",
+                  description:
+                    "The Enforcer watches Sepolia and compiles each mandate into a Privy policy and a signed Arc anchor. A propagator, not an authority — it can only ever narrow, never widen.",
+                },
+                {
+                  chain: "Arc",
+                  title: "Money",
+                  accentClass: "bg-expiring",
+                  description:
+                    "Where value actually moves, checked against the anchor on every spend. Gas is USDC, settlement is deterministic, and the agent's own wallet holds almost nothing.",
+                },
+              ]}
+            />
           </div>
         </section>
 
@@ -230,42 +225,35 @@ export default function LandingPage() {
         <section data-theme="dark" className="bg-base py-24 sm:py-28">
           <div className="mx-auto max-w-6xl px-6">
             <SectionHeading eyebrow="Inside the observatory">How a mandate moves</SectionHeading>
-            <motion.div
-              variants={stagger(0.1)}
-              initial="hidden"
-              whileInView="visible"
-              viewport={VIEWPORT}
-              className="mt-12 grid gap-5 sm:grid-cols-2"
-            >
-              <motion.div variants={fadeUp}>
-                <StepCard
-                  step={1}
-                  title="Issue"
-                  description="The org composes a mandate live: budget, per-tx cap, allowlist, expiry, sub-delegation depth. One ENS subname is minted with its own dedicated resolver — no hard-coded values, ever."
-                />
-              </motion.div>
-              <motion.div variants={fadeUp}>
-                <StepCard
-                  step={2}
-                  title="Attenuate"
-                  description="An agent can delegate a strictly narrower slice of its own mandate to a sub-agent. Never wider — enforced by the contract's own math, not by convention or trust."
-                />
-              </motion.div>
-              <motion.div variants={fadeUp}>
-                <StepCard
-                  step={3}
-                  title="Spend"
-                  description="Every payment checks the anchor first: revoked? expired? over the per-tx cap? off the allowlist? stale? Five ways to fail closed, one to succeed."
-                />
-              </motion.div>
-              <motion.div variants={fadeUp}>
-                <StepCard
-                  step={4}
-                  title="Revoke"
-                  description="One transaction on Sepolia. The Enforcer tears down the Privy policy and flips the Arc anchor — the agent's next payment is refused mid-flight, on-chain."
-                />
-              </motion.div>
-            </motion.div>
+            <MandateFlow
+              steps={[
+                {
+                  title: "Onboard",
+                  description:
+                    "An org connects a wallet, picks a name, and the app runs the whole ENSv2 registration and Arc vault deployment for it — one guided flow, nobody touches Foundry.",
+                },
+                {
+                  title: "Issue",
+                  description:
+                    "The org composes a mandate for an agent: budget, per-tx cap, allowlist, expiry, sub-delegation depth. A real Privy wallet is provisioned for it in the same step — no seed phrase, ever held by anyone.",
+                },
+                {
+                  title: "Run",
+                  description:
+                    "MANDATE doesn't supply the agent — whatever you already run (an LLM loop, a cron job, your own stack) picks up that wallet and gets to work. Two independent systems check every payment it tries to make.",
+                },
+                {
+                  title: "Attenuate",
+                  description:
+                    "An agent can delegate a strictly narrower slice of its own mandate to a sub-agent it hires. Never wider — enforced by the contract's own math, not by convention or trust.",
+                },
+                {
+                  title: "Revoke",
+                  description:
+                    "One transaction on Sepolia. The Enforcer tears down the Privy policy and flips the Arc anchor — the agent's next payment is refused mid-flight, on-chain.",
+                },
+              ]}
+            />
           </div>
         </section>
 
