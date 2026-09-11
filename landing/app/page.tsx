@@ -136,16 +136,13 @@ export default function LandingPage() {
               <motion.div variants={fadeUp}>
                 <Display as="h1" size="lg" className="mt-5">
                   ENS subnames are revocable powers of attorney for AI agents.
-                  <span className="text-tertiary"> Arc is where they spend.</span>
                 </Display>
               </motion.div>
               <motion.div variants={fadeUp}>
-                <Lede className="mx-auto mt-6 max-w-2xl">
-                  A company issues each of its AI agents an ENS subname — think
-                  research.acme.eth. That name&rsquo;s records are the agent&rsquo;s entire
-                  spending authority: how much, to whom, until when. The agent can read its own
-                  limits but cannot edit them. Revoke the name, and its very next payment is
-                  refused — before it signs, and again on-chain if it somehow tried.
+                <Lede className="mx-auto mt-6 max-w-xl">
+                  The name&rsquo;s records are the agent&rsquo;s entire spending authority —
+                  budget, allowlist, expiry. It can read them, never edit them. Revoke the name
+                  and the next payment stops, before it signs and again on-chain.
                 </Lede>
               </motion.div>
               <motion.div variants={fadeUp} className="mt-9 flex items-center justify-center">
