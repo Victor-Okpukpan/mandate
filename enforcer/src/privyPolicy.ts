@@ -83,37 +83,49 @@ const DENY_ALL_RULE = {
   conditions: [],
 };
 
-/** The one rule a qualifying payment must satisfy, all three conditions ANDed. Extracted so
- *  `createPolicyForAgent` (create path) and `syncPolicyForWallet` (update path) build byte-for-byte
- *  the same rule from the same terms. */
-function buildMandateGateRule(terms: MandateTermsForPolicy) {
-  return {
-    name: "mandate-gate",
-    method: "eth_sendTransaction" as const,
-    action: "ALLOW" as const,
-    conditions: [
-      {
-        field_source: "ethereum_transaction" as const,
-        field: "to" as const,
-        operator: "eq" as const,
-        value: terms.agentTreasury,
-      },
-      {
-        field_source: "ethereum_calldata" as const,
-        field: "payTo.amount",
-        operator: "lte" as const,
-        value: terms.perTxCapUsdcBaseUnits.toString(),
-        abi: PAY_TO_ABI,
-      },
-      {
-        field_source: "ethereum_calldata" as const,
-        field: "payTo.to",
-        operator: "in" as const,
-        value: terms.allowedRecipients,
-        abi: PAY_TO_ABI,
-      },
-    ],
-  };
+/** The three conditions a qualifying payment must satisfy, ANDed, shared by both gate rules
+ *  below. Extracted so `createPolicyForAgent` (create path) and `syncPolicyForWallet` (update
+ *  path) build byte-for-byte the same rules from the same terms. */
+function mandateGateConditions(terms: MandateTermsForPolicy) {
+  return [
+    {
+      field_source: "ethereum_transaction" as const,
+      field: "to" as const,
+      operator: "eq" as const,
+      value: terms.agentTreasury,
+    },
+    {
+      field_source: "ethereum_calldata" as const,
+      field: "payTo.amount",
+      operator: "lte" as const,
+      value: terms.perTxCapUsdcBaseUnits.toString(),
+      abi: PAY_TO_ABI,
+    },
+    {
+      field_source: "ethereum_calldata" as const,
+      field: "payTo.to",
+      operator: "in" as const,
+      value: terms.allowedRecipients,
+      abi: PAY_TO_ABI,
+    },
+  ];
+}
+
+/**
+ * One ALLOW rule per RPC method a qualifying payment might arrive as, all sharing the same three
+ * conditions. `eth_sendTransaction` is the normal path (Privy signs and relays); `eth_signTransaction`
+ * is also gated identically because it's the sign-then-broadcast-ourselves workaround
+ * `agents/shared/src/signer.ts` uses on any chain Privy's Wallet API isn't yet authorized to relay
+ * for itself (Arc testnet, currently) — without this second rule, the policy engine's implicit
+ * `DENY *` catches that method and every payment on such a chain 400s as a policy violation
+ * regardless of the mandate's own terms.
+ */
+function buildMandateGateRules(terms: MandateTermsForPolicy) {
+  const conditions = mandateGateConditions(terms);
+  return [
+    { name: "mandate-gate-send", method: "eth_sendTransaction" as const, action: "ALLOW" as const, conditions },
+    { name: "mandate-gate-sign", method: "eth_signTransaction" as const, action: "ALLOW" as const, conditions },
+  ];
 }
 
 /**
@@ -132,7 +144,7 @@ export async function createPolicyForAgent(
     name: policyName,
     version: "1.0",
     chain_type: "ethereum",
-    rules: [buildMandateGateRule(terms), DENY_ALL_RULE],
+    rules: [...buildMandateGateRules(terms), DENY_ALL_RULE],
   });
   return { policyId: policy.id };
 }
@@ -164,7 +176,7 @@ export async function syncPolicyForWallet(
   }
 
   const updated = await privy.policies().update(existingPolicyId, {
-    rules: [buildMandateGateRule(terms), DENY_ALL_RULE],
+    rules: [...buildMandateGateRules(terms), DENY_ALL_RULE],
   });
   // Idempotent — the wallet already carries this policy id if it got here via the branch above,
   // but a wallet whose policy_ids were set by some other path might not, so keep it explicit.
