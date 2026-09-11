@@ -379,6 +379,11 @@ function OrgOverview({ org }: { org: OrgWithVault }) {
             node={selectedNode.node}
             state={mandateStateOf(selectedNode, now)}
             addresses={detailAddresses}
+            displayName={
+              labels.get(selectedNode.node)
+                ? `${labels.get(selectedNode.node)}.${org.orgEnsName}`
+                : org.orgEnsName
+            }
             onRevoke={isAdmin ? () => handleRevoke(selectedNode.node) : undefined}
             revoking={revokingNode === selectedNode.node && isPending}
           />

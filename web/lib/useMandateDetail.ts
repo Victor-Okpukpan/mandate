@@ -10,6 +10,7 @@ import {
   PermissionedResolverAbi,
 } from "@mandate/shared/abis";
 import { MANDATE_KEYS, AGENT_KEYS, BINDING_KEYS } from "@mandate/shared/ensKeys";
+import { parseAllowHuman } from "@mandate/shared/allowHuman";
 import type { DeployedAddresses } from "./addresses";
 
 /** Ordered so the drawer/page render principal-written records before agent-written ones —
@@ -73,6 +74,19 @@ export function useMandateDetail(node: Hex | undefined, addresses: DeployedAddre
     query: { enabled: Boolean(resolverAddress && node) },
   });
 
+  // `mandate.allow.human` — the actual recipient list, not the merkle root the contract checks
+  // against. This is the one thing an admin actually wants to see ("who can this agent pay?"); the
+  // root alone is meaningless to read.
+  const { data: allowHumanResult } = useReadContract({
+    address: resolverAddress,
+    abi: PermissionedResolverAbi,
+    functionName: "text",
+    args: node ? [node, MANDATE_KEYS.allowHuman] : undefined,
+    chainId: sepolia.id,
+    query: { enabled: Boolean(resolverAddress && node) },
+  });
+  const allowedRecipients = parseAllowHuman(allowHumanResult ?? "");
+
   const agentWallet = mandate?.agentWallet;
 
   const { data: anchor } = useReadContract({
@@ -113,6 +127,7 @@ export function useMandateDetail(node: Hex | undefined, addresses: DeployedAddre
     mandateRecords,
     agentRecords,
     bindingRecords,
+    allowedRecipients,
     anchor,
     account,
   };

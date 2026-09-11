@@ -4,7 +4,6 @@ import type { Hex } from "viem";
 import { StatusPill, type MandateState } from "@mandate/ui/components/StatusPill";
 import { MonoValue } from "@mandate/ui/components/MonoValue";
 import { Countdown } from "@mandate/ui/components/Countdown";
-import { Eyebrow, RuleLabel } from "@mandate/ui/components/Type";
 import { fromErc20Usdc } from "@mandate/shared/decimals";
 import { BINDING_KEYS } from "@mandate/shared/ensKeys";
 import { useMandateDetail } from "../../lib/useMandateDetail";
@@ -17,20 +16,34 @@ interface MandateDetailPanelProps {
   node: Hex;
   state: MandateState;
   addresses: DeployedAddresses;
+  /** e.g. "researcher.acme.eth" — falls back to the raw node hash when the caller hasn't
+   *  resolved a label yet (labels come from a separate multicall; see `useMandateLabels`). */
+  displayName?: string;
   onRevoke?: () => void;
   revoking?: boolean;
 }
 
-function RecordRow({ label, value, badge }: { label: string; value: string; badge?: React.ReactNode }) {
+function Row({ label, value, hint }: { label: string; value: React.ReactNode; hint?: string }) {
+  return (
+    <div className="flex items-start justify-between gap-4 py-2.5 text-[13px]">
+      <span className="shrink-0 text-tertiary">{label}</span>
+      <span className="flex flex-col items-end gap-0.5 text-right">
+        <span className="text-secondary">{value}</span>
+        {hint ? <span className="text-[11px] text-disabled">{hint}</span> : null}
+      </span>
+    </div>
+  );
+}
+
+/** The literal on-chain ENS text record — for anyone who wants to verify this isn't a UI story.
+ *  Collapsed by default; the plain-language rows above it are the ones meant to be read. */
+function RawRecordRow({ label, value }: { label: string; value: string }) {
   const empty = value.length === 0;
   return (
-    <div className="flex items-baseline justify-between gap-4 py-2 text-[13px]">
+    <div className="flex items-baseline justify-between gap-4 py-1.5 text-[12px]">
       <span className="shrink-0 font-mono text-tertiary">{label}</span>
-      <span className="flex min-w-0 items-center justify-end gap-2">
-        <span className={`truncate text-right font-mono ${empty ? "text-disabled" : "text-secondary"}`}>
-          {empty ? "—" : value}
-        </span>
-        {badge}
+      <span className={`truncate text-right font-mono ${empty ? "text-disabled" : "text-secondary"}`}>
+        {empty ? "—" : value}
       </span>
     </div>
   );
@@ -41,30 +54,28 @@ function RecordRow({ label, value, badge }: { label: string; value: string; badg
  * `useIdentityVerification.ts`'s NatSpec for why `bindIdentity` alone can never be trusted as
  * verification. "unset" (no id claimed yet) renders nothing, same as an empty record.
  */
-function IdentityBadge({ agentIdText, agentWallet }: { agentIdText: string; agentWallet?: `0x${string}` }) {
-  // "" and "0" both mean "no ERC-8004 id claimed" — don't send either to the registry as a lookup.
-  const claimed = agentIdText && agentIdText !== "0" ? agentIdText : undefined;
-  const verification = useIdentityVerification(claimed, agentWallet);
+function IdentityBadge({ agentIdText, agentWallet }: { agentIdText: string | undefined; agentWallet?: `0x${string}` }) {
+  const verification = useIdentityVerification(agentIdText, agentWallet);
   switch (verification.status) {
     case "unset":
       return null;
     case "loading":
-      return <span className="font-mono text-[11px] text-tertiary">checking…</span>;
+      return <span className="text-[11px] text-tertiary">checking…</span>;
     case "verified":
       return (
-        <span className="font-mono text-[11px] text-live" title="getAgentWallet() on the real Arc registry matches this mandate's agentWallet">
+        <span className="text-[11px] text-live" title="Confirmed against the real Arc identity registry, not just this mandate's own say-so">
           ✓ verified
         </span>
       );
     case "not-found":
       return (
-        <span className="font-mono text-[11px] text-revoked" title="No such agent id on the real Arc IdentityRegistry">
+        <span className="text-[11px] text-revoked" title="No such agent id on the real Arc identity registry">
           ✗ not found
         </span>
       );
     case "mismatch":
       return (
-        <span className="font-mono text-[11px] text-revoked" title={`Registry says this id's wallet is ${verification.realWallet}`}>
+        <span className="text-[11px] text-revoked" title={`The registry says this id belongs to a different wallet (${verification.realWallet})`}>
           ✗ wallet mismatch
         </span>
       );
@@ -103,61 +114,98 @@ function PolicyRuleRow({ rule }: { rule: PrivyPolicyRule }) {
   );
 }
 
-function Plane({
-  eyebrow,
+function Section({
   title,
+  subtitle,
   children,
 }: {
-  eyebrow: string;
   title: string;
+  subtitle?: string;
   children: React.ReactNode;
 }) {
   return (
     <section>
-      <Eyebrow>{eyebrow}</Eyebrow>
-      <h3 className="mt-1 font-sans text-[19px] font-semibold tracking-tight text-primary">{title}</h3>
+      <h3 className="font-sans text-[16px] font-semibold tracking-tight text-primary">{title}</h3>
+      {subtitle ? <p className="mt-0.5 text-[12.5px] text-tertiary">{subtitle}</p> : null}
       <div className="mt-3 divide-y divide-border-subtle border-t border-border-subtle">{children}</div>
     </section>
   );
+}
+
+function formatBudgetPeriod(periodSeconds: number): string {
+  if (periodSeconds === 0) return "Never — this is a lifetime budget";
+  const days = Math.round(periodSeconds / 86_400);
+  return days === 1 ? "Every day" : `Every ${days} days`;
+}
+
+function formatDate(unixSeconds: number): string {
+  return new Date(unixSeconds * 1000).toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
 }
 
 /**
  * The ENS / Privy / Arc triptych — the same three-plane read used both inline (the tree drawer)
  * and at the standalone `/agent/[name]` deep link, via `useMandateDetail`. One component, one
  * source of truth for what a mandate "is" across all three surfaces.
+ *
+ * Rewritten to lead with plain sentences ("Resets every 7 days", "3 addresses allowed") rather
+ * than the raw `mandate.budget.perTx`-style ENS key names — those still exist, just folded into
+ * the "Raw record" disclosure at the bottom for anyone who wants to verify this isn't a UI story.
  */
-export function MandateDetailPanel({ node, state, addresses, onRevoke, revoking }: MandateDetailPanelProps) {
-  const { mandate, agentWallet, mandateRecords, agentRecords, bindingRecords, anchor, account } =
-    useMandateDetail(node, addresses);
+export function MandateDetailPanel({ node, state, addresses, displayName, onRevoke, revoking }: MandateDetailPanelProps) {
+  const {
+    mandate,
+    agentWallet,
+    mandateRecords,
+    agentRecords,
+    bindingRecords,
+    allowedRecipients,
+    anchor,
+    account,
+  } = useMandateDetail(node, addresses);
   const privy = usePrivyMandateStatus(agentWallet);
-  const erc8004IdText = bindingRecords.find((r) => r.key === BINDING_KEYS.erc8004Id)?.value;
-  const reputation = useReputation(erc8004IdText);
+  const erc8004IdRaw = bindingRecords.find((r) => r.key === BINDING_KEYS.erc8004Id)?.value;
+  const model = bindingRecords.find((r) => r.key === BINDING_KEYS.model)?.value;
+  const arcWallet = bindingRecords.find((r) => r.key === BINDING_KEYS.arcWallet)?.value;
+  // "" and "0" both mean "no id claimed" — never send either to the registry as a lookup, and
+  // never show a reputation score that isn't actually this agent's (a bare "0" resolves to a real,
+  // unrelated agent's reputation on the live registry, which is worse than showing nothing).
+  const erc8004Id = erc8004IdRaw && erc8004IdRaw !== "0" ? erc8004IdRaw : undefined;
+  const reputation = useReputation(erc8004Id);
 
   const budgetTotal = mandate ? fromErc20Usdc(mandate.terms.budgetTotal) : undefined;
+  const perTxCap = mandate ? fromErc20Usdc(mandate.terms.perTxCap) : undefined;
   const spent = account ? fromErc20Usdc(account[0]) : undefined;
+  const owed = account && account[1] > 0n ? fromErc20Usdc(account[1]) : undefined;
 
   return (
     <div className="flex flex-col gap-8">
       <header>
         <div className="flex items-center gap-2.5">
           <StatusPill state={state} pulse={state === "live"} />
-          {mandate ? (
-            <Countdown expiresAt={Number(mandate.terms.expiry)} urgency={state === "revoked" ? "revoked" : undefined} />
+          {/* A countdown next to "Revoked" reads as "still ticking toward something" — it isn't,
+              revocation already ended it, so the live clock only ever shows for a state where the
+              remaining time is still the actual reason it might stop working. */}
+          {mandate && state !== "revoked" ? (
+            <Countdown expiresAt={Number(mandate.terms.expiry)} />
           ) : null}
         </div>
-        <p className="mt-3 font-mono text-[15px] font-medium tracking-tight text-primary">
-          <MonoValue value={node} truncate={12} />
+        <p className="mt-3 font-sans text-[17px] font-semibold tracking-tight text-primary">
+          {displayName ?? <MonoValue value={node} truncate={10} />}
         </p>
         {agentWallet ? (
           <p className="mt-1 flex items-center gap-1.5 text-[13px] text-tertiary">
-            agent wallet
+            wallet
             <MonoValue value={agentWallet} className="text-secondary" />
           </p>
         ) : null}
         {budgetTotal ? (
           <p className="mt-3 text-[13px] text-secondary">
             <span className="font-mono tnum text-primary">${spent ?? "0"}</span> of{" "}
-            <span className="font-mono tnum">${budgetTotal}</span> USDC committed
+            <span className="font-mono tnum">${budgetTotal}</span> USDC spent
           </p>
         ) : null}
       </header>
@@ -173,63 +221,80 @@ export function MandateDetailPanel({ node, state, addresses, onRevoke, revoking 
         </button>
       ) : null}
 
-      <RuleLabel>Authority · Sepolia</RuleLabel>
-      <Plane eyebrow="ENS resolver records" title="mandate.*">
-        {mandateRecords.map((r) => (
-          <RecordRow key={r.key} label={r.key} value={r.value} />
-        ))}
-      </Plane>
-      <Plane eyebrow="Agent-writable" title="agent.*">
-        {agentRecords.map((r) => (
-          <RecordRow key={r.key} label={r.key} value={r.value} />
-        ))}
-      </Plane>
-      <Plane eyebrow="Principal-written · identity, not authority" title="agent.arc.wallet / erc8004 / model">
-        {bindingRecords.map((r) => (
-          <RecordRow
-            key={r.key}
-            label={r.key}
-            value={r.key === BINDING_KEYS.erc8004Id && r.value === "0" ? "" : r.value}
-            badge={
-              r.key === BINDING_KEYS.erc8004Id ? (
-                <IdentityBadge agentIdText={r.value} agentWallet={agentWallet} />
-              ) : undefined
-            }
+      {mandate ? (
+        <Section title="What this agent can do" subtitle="Set when the mandate was issued — the agent cannot change any of this.">
+          <Row label="Total budget" value={`$${budgetTotal} USDC`} />
+          <Row label="Per-payment limit" value={`$${perTxCap} USDC`} />
+          <Row label="Budget resets" value={formatBudgetPeriod(mandate.terms.budgetPeriod)} />
+          <Row label="Expires" value={state === "revoked" ? "Revoked before expiry" : formatDate(Number(mandate.terms.expiry))} />
+          <Row
+            label="Can delegate to sub-agents"
+            value={mandate.terms.maxDepth > 0 ? `Yes, up to ${mandate.terms.maxDepth} level${mandate.terms.maxDepth === 1 ? "" : "s"} deep` : "No"}
           />
-        ))}
-        {reputation.status === "available" ? (
-          <RecordRow
-            label="erc8004 reputation"
-            value={`${reputation.averageValue.toFixed(2)} avg · ${reputation.count} feedback`}
-          />
-        ) : reputation.status === "no-feedback" ? (
-          <RecordRow label="erc8004 reputation" value="no feedback yet" />
-        ) : null}
-      </Plane>
+        </Section>
+      ) : null}
 
-      <RuleLabel>Enforcement · Privy</RuleLabel>
-      <Plane eyebrow={privy.wallet ? `Wallet ${privy.wallet.id}` : "Server wallet"} title="Signing policy">
-        {!privy.privyConfigured ? (
+      <Section title="Who it can pay" subtitle="Any payment to an address not on this list is rejected on-chain, regardless of amount.">
+        {allowedRecipients.length === 0 ? (
           <p className="py-3 text-[13px] text-tertiary">
-            Privy isn&rsquo;t configured on this deployment (missing NEXT_PUBLIC_PRIVY_APP_ID).
+            No addresses allowed yet — as written, this mandate can&rsquo;t pay anyone.
           </p>
+        ) : (
+          allowedRecipients.map((addr) => (
+            <div key={addr} className="flex items-center justify-between py-2 text-[13px]">
+              <MonoValue value={addr} className="text-secondary" />
+            </div>
+          ))
+        )}
+      </Section>
+
+      <Section title="What the agent has reported" subtitle="Written by the agent itself — a status line, not a spending permission.">
+        <Row label="Status" value={agentRecords.find((r) => r.key === "agent.status")?.value || "Nothing reported yet"} />
+        <Row label="Last heartbeat" value={agentRecords.find((r) => r.key === "agent.heartbeat")?.value || "—"} />
+        <Row label="Last output" value={agentRecords.find((r) => r.key === "agent.output.last")?.value || "—"} />
+      </Section>
+
+      <Section title="Identity" subtitle="Optional — who the agent claims to be, checked against the real registry, not just its own say-so.">
+        <Row label="AI model" value={model || "Not stated"} />
+        <Row
+          label="ERC-8004 identity"
+          value={
+            <span className="flex items-center gap-1.5">
+              {erc8004Id ?? "Not registered"}
+              <IdentityBadge agentIdText={erc8004Id} agentWallet={agentWallet} />
+            </span>
+          }
+        />
+        {reputation.status === "available" ? (
+          <Row label="Reputation" value={`${reputation.averageValue.toFixed(2)} / 100 · ${reputation.count} reviews`} />
+        ) : reputation.status === "no-feedback" ? (
+          <Row label="Reputation" value="No feedback yet" />
+        ) : null}
+        {arcWallet && arcWallet.toLowerCase() !== (agentWallet ?? "").toLowerCase() ? (
+          <Row label="Separate Arc spending wallet" value={<MonoValue value={arcWallet} />} />
+        ) : null}
+      </Section>
+
+      <Section title="Off-chain protection" subtitle="Privy checks the recipient and payment size before the agent's wallet ever signs.">
+        {!privy.privyConfigured ? (
+          <p className="py-3 text-[13px] text-tertiary">Privy isn&rsquo;t configured on this deployment.</p>
         ) : !privy.signedIn ? (
-          <p className="py-3 text-[13px] text-tertiary">Sign in to read this agent&rsquo;s live policy.</p>
+          <p className="py-3 text-[13px] text-tertiary">Sign in to see this agent&rsquo;s live protection status.</p>
         ) : privy.walletLoading ? (
-          <p className="py-3 text-[13px] text-tertiary">Looking up the Privy wallet…</p>
+          <p className="py-3 text-[13px] text-tertiary">Checking…</p>
         ) : !agentWallet ? (
-          <p className="py-3 text-[13px] text-tertiary">Reading this mandate&rsquo;s agent wallet…</p>
+          <p className="py-3 text-[13px] text-tertiary">Reading this mandate&rsquo;s wallet…</p>
         ) : !privy.wallet ? (
           <p className="py-3 text-[13px] text-tertiary">
-            No Privy server wallet found for <MonoValue value={agentWallet} className="text-secondary" /> —
-            it wasn&rsquo;t provisioned through this app, or belongs to a different Privy app.
+            No wallet found for <MonoValue value={agentWallet} className="text-secondary" /> — it
+            wasn&rsquo;t provisioned through this app.
           </p>
         ) : privy.policyLoading ? (
-          <p className="py-3 text-[13px] text-tertiary">Reading the attached policy…</p>
+          <p className="py-3 text-[13px] text-tertiary">Checking…</p>
         ) : !privy.policy ? (
           <p className="py-3 text-[13px] text-tertiary">
-            Wallet found, no policy attached yet — the Enforcer syncs one from this mandate&rsquo;s
-            terms the next time it processes an event for this node.
+            Not protected yet — the Enforcer attaches this the next time it processes an event for
+            this mandate.
           </p>
         ) : (
           <>
@@ -238,35 +303,31 @@ export function MandateDetailPanel({ node, state, addresses, onRevoke, revoking 
             ))}
           </>
         )}
-      </Plane>
+      </Section>
 
-      <RuleLabel>Money · Arc testnet</RuleLabel>
-      <Plane eyebrow="MandateAnchor" title="Enforcement">
-        {/* An un-synced anchor reads back as a zero-filled tuple, not `undefined` — `updatedAt > 0`
-            is the real "has the Enforcer mirrored this to Arc yet" test. */}
+      <Section title="On-chain protection" subtitle="The Arc contracts check every payment for real — this is what actually stops a bad one, whether or not Privy caught it first.">
         {anchor && anchor[6] > 0n ? (
-          <>
-            <RecordRow label="revoked" value={anchor[8] ? "true" : "false"} />
-            <RecordRow label="updatedAt" value={anchor[6].toString()} />
-            <RecordRow label="nonce" value={anchor[7].toString()} />
-          </>
+          <Row label="Synced to Arc" value={anchor[8] ? "Yes, and revoked there too" : "Yes, live"} />
         ) : (
           <p className="py-3 text-[13px] text-tertiary">
-            Not synced to Arc yet — the Enforcer mirrors this mandate onto the anchor the next time
-            it processes an event for this node.
+            Not synced to Arc yet — the Enforcer mirrors this mandate onto Arc the next time it
+            processes an event for this node.
           </p>
         )}
-      </Plane>
-      <Plane eyebrow="AgentTreasury" title="Ledger">
-        {account ? (
-          <>
-            <RecordRow label="spent (this window)" value={`$${fromErc20Usdc(account[0])}`} />
-            <RecordRow label="principal owed" value={`$${fromErc20Usdc(account[1])}`} />
-          </>
-        ) : (
-          <p className="py-3 text-[13px] text-tertiary">No treasury account opened yet.</p>
-        )}
-      </Plane>
+        {owed ? <Row label="Owed back to the treasury" value={`$${owed} USDC`} hint="A short-term credit facility, not overspending — see the docs." /> : null}
+      </Section>
+
+      <details className="group">
+        <summary className="cursor-pointer text-[12px] font-medium text-tertiary transition-colors hover:text-secondary">
+          Raw on-chain record
+        </summary>
+        <div className="mt-3 divide-y divide-border-subtle border-t border-border-subtle">
+          <RawRecordRow label="node" value={node} />
+          {mandateRecords.map((r) => (
+            <RawRecordRow key={r.key} label={r.key} value={r.value} />
+          ))}
+        </div>
+      </details>
     </div>
   );
 }

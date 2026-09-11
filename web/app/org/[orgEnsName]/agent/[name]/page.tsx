@@ -7,6 +7,7 @@ import { Eyebrow } from "@mandate/ui/components/Type";
 import { SkeletonRows } from "@mandate/ui/components/Skeleton";
 import { useSelectedOrg } from "@/lib/useSelectedOrg";
 import { mandateStateOf, useMandateGraph } from "@/lib/useMandateGraph";
+import { useMandateLabels } from "@/lib/useMandateLabels";
 import { MandateDetailPanel } from "@/app/_components/MandateDetailPanel";
 import { OrgNotFound } from "@/app/_components/OrgNotFound";
 
@@ -44,9 +45,11 @@ export default function AgentDetailPage({
 
 function AgentDetailInner({ node, org }: { node: Hex; org: OrgWithVault }) {
   const { nodes } = useMandateGraph(org.registrar, org.createdAtBlock);
+  const labels = useMandateLabels([node], org.registrar);
   const now = Math.floor(Date.now() / 1000);
   const match = nodes.find((n) => n.node === node);
   const state = match ? mandateStateOf(match, now) : "stale";
+  const label = labels.get(node);
 
   const detailAddresses = {
     mandateRegistrar: org.registrar,
@@ -58,7 +61,12 @@ function AgentDetailInner({ node, org }: { node: Hex; org: OrgWithVault }) {
     <div className="mx-auto max-w-2xl px-6 py-10 sm:py-14">
       <Eyebrow>Mandate detail</Eyebrow>
       <div className="mt-6">
-        <MandateDetailPanel node={node} state={state} addresses={detailAddresses} />
+        <MandateDetailPanel
+          node={node}
+          state={state}
+          addresses={detailAddresses}
+          displayName={label ? `${label}.${org.orgEnsName}` : org.orgEnsName}
+        />
       </div>
     </div>
   );
