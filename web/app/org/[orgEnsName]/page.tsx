@@ -30,6 +30,7 @@ import { MandateDetailPanel } from "@/app/_components/MandateDetailPanel";
 import { OrgNotFound } from "@/app/_components/OrgNotFound";
 
 const SHOW_ADVANCED = process.env.NEXT_PUBLIC_SHOW_ADVANCED === "true";
+const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 
 /**
  * The org's own operations view — everything that used to live at `/` before orgs existed.
@@ -76,14 +77,15 @@ function AdversaryPanel() {
  * visit just to see how much the org's agents can draw against. Funding is `approve` (max, once)
  * then `deposit` on Arc — the org admin's own USDC.
  */
-function TreasuryStrip({ treasury }: { treasury: Address }) {
+function TreasuryStrip({ treasury, isAdmin }: { treasury: Address; isAdmin: boolean }) {
   const arcAddrs = getPublicArcAddresses();
   const { address, chainId } = useAccount();
   const { switchChainAsync } = useSwitchChain();
   const arcClient = usePublicClient({ chainId: arcTestnet.id });
   const { writeContractAsync } = useWriteContract();
+  const [mode, setMode] = useState<"fund" | "withdraw" | null>(null);
   const [amount, setAmount] = useState("");
-  const [open, setOpen] = useState(false);
+  const [withdrawTo, setWithdrawTo] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | undefined>();
 
@@ -93,12 +95,19 @@ function TreasuryStrip({ treasury }: { treasury: Address }) {
     functionName: "totalDeposited",
     chainId: arcTestnet.id,
   });
-  const { data: drawn } = useReadContract({
+  const { data: drawn, refetch: refetchDrawn } = useReadContract({
     address: treasury,
     abi: AgentTreasuryAbi,
     functionName: "totalDrawn",
     chainId: arcTestnet.id,
   });
+
+  function openMode(next: "fund" | "withdraw") {
+    setError(undefined);
+    setAmount("");
+    if (next === "withdraw" && address) setWithdrawTo(address);
+    setMode((m) => (m === next ? null : next));
+  }
 
   async function fund() {
     setError(undefined);
@@ -137,8 +146,42 @@ function TreasuryStrip({ treasury }: { treasury: Address }) {
       });
       await arcClient.waitForTransactionReceipt({ hash: depHash });
       setAmount("");
-      setOpen(false);
+      setMode(null);
       refetchDep();
+    } catch (err) {
+      setError(formatTxError(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function withdraw() {
+    setError(undefined);
+    if (!arcClient) return;
+    const value = parseUnits(amount || "0", 6);
+    if (value <= 0n) {
+      setError("Enter an amount.");
+      return;
+    }
+    if (!ADDRESS_RE.test(withdrawTo)) {
+      setError("Enter a valid recipient address.");
+      return;
+    }
+    setBusy(true);
+    try {
+      if (chainId !== arcTestnet.id) await switchChainAsync({ chainId: arcTestnet.id });
+      const hash = await writeContractAsync({
+        address: treasury,
+        abi: AgentTreasuryAbi,
+        functionName: "withdraw",
+        args: [withdrawTo as Address, value],
+        chainId: arcTestnet.id,
+      });
+      await arcClient.waitForTransactionReceipt({ hash });
+      setAmount("");
+      setMode(null);
+      refetchDep();
+      refetchDrawn();
     } catch (err) {
       setError(formatTxError(err));
     } finally {
@@ -153,15 +196,33 @@ function TreasuryStrip({ treasury }: { treasury: Address }) {
           <Stat label="Treasury" value={fromErc20Usdc(deposited ?? 0n)} unit="USDC" />
           <Stat label="Drawn" value={fromErc20Usdc(drawn ?? 0n)} unit="USDC" />
         </div>
-        <Button variant="secondary" size="sm" onClick={() => setOpen((v) => !v)}>
-          {open ? "Cancel" : "Fund"}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="secondary" size="sm" onClick={() => openMode("fund")}>
+            {mode === "fund" ? "Cancel" : "Fund"}
+          </Button>
+          {isAdmin ? (
+            <Button variant="secondary" size="sm" onClick={() => openMode("withdraw")}>
+              {mode === "withdraw" ? "Cancel" : "Withdraw"}
+            </Button>
+          ) : null}
+        </div>
       </div>
-      {open ? (
+      {mode === "fund" ? (
         <div className="mt-4 flex items-end gap-3">
           <Input mono type="number" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="100" />
           <Button size="sm" onClick={fund} disabled={busy}>
             {busy ? "Funding…" : "Deposit USDC"}
+          </Button>
+        </div>
+      ) : mode === "withdraw" ? (
+        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+          <div className="flex-1">
+            <label className="mb-1 block font-mono text-[10px] uppercase tracking-label text-tertiary">To</label>
+            <Input mono value={withdrawTo} onChange={(e) => setWithdrawTo(e.target.value.trim())} placeholder="0x…" />
+          </div>
+          <Input mono type="number" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="100" />
+          <Button size="sm" onClick={withdraw} disabled={busy}>
+            {busy ? "Withdrawing…" : "Withdraw USDC"}
           </Button>
         </div>
       ) : null}
@@ -256,7 +317,7 @@ function OrgOverview({ org }: { org: OrgWithVault }) {
         transition={{ delay: 0.06 }}
         className="mt-10 grid gap-4 sm:grid-cols-2"
       >
-        <TreasuryStrip treasury={org.vault!.treasury} />
+        <TreasuryStrip treasury={org.vault!.treasury} isAdmin={isAdmin} />
         <Card padding="lg">
           <div className="grid grid-cols-3 gap-6">
             <Stat label="Live" value={counts.live} />
