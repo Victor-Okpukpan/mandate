@@ -85,6 +85,61 @@ export async function listVaults(
 }
 
 /**
+ * Same result as `listVaults`, without ever calling `eth_getLogs` on Arc — read live via
+ * `vaultsOfAdmin`/`vaults` instead. Arc's public RPC has been observed to reject `eth_getLogs`
+ * outright ("requested range too large") at ranges well under Sepolia's 50k cap, and even
+ * `getContractEventsChunked`'s halving can't find a window size that works. `vaultsOfAdmin` has no
+ * such cap — it's a plain `eth_call`. `createdAtBlock` on the result is only as accurate as the
+ * caller's `fallbackBlock` (the vault contract stores a timestamp, not a block number, so there's
+ * no real block to read back) — good enough as a `fromBlock` floor for a later log query, not a
+ * precise deploy block.
+ */
+async function withRetry<T>(fn: () => Promise<T>, tries = 4): Promise<T> {
+  let lastErr: unknown;
+  for (let i = 0; i < tries; i++) {
+    try {
+      return await fn();
+    } catch (e) {
+      lastErr = e;
+      await new Promise((r) => setTimeout(r, 400 * 2 ** i));
+    }
+  }
+  throw lastErr;
+}
+
+export async function listVaultsForAdmins(
+  client: PublicClient,
+  factory: Address,
+  admins: Address[],
+  fallbackBlock: bigint = 0n,
+): Promise<Vault[]> {
+  const uniqueAdmins = Array.from(new Set(admins.map((a) => a.toLowerCase()))) as Address[];
+  const anchorLists = await Promise.all(
+    uniqueAdmins.map((admin) =>
+      withRetry(() =>
+        client.readContract({ address: factory, abi: ArcVaultFactoryAbi, functionName: "vaultsOfAdmin", args: [admin] }),
+      ),
+    ),
+  );
+  const anchors = Array.from(new Set(anchorLists.flat()));
+  const details = await Promise.all(
+    anchors.map((anchor) =>
+      withRetry(() =>
+        client.readContract({ address: factory, abi: ArcVaultFactoryAbi, functionName: "vaults", args: [anchor] }),
+      ),
+    ),
+  );
+  return details.map((d) => ({
+    anchor: d[0],
+    treasury: d[1],
+    admin: d[2],
+    enforcer: "0x0000000000000000000000000000000000000000" as Address,
+    orgRootNode: d[3],
+    createdAtBlock: fallbackBlock,
+  }));
+}
+
+/**
  * Joins orgs to vaults by `orgRootNode`. A vault created with `createVault` (not
  * `createVaultFor`) tags itself with the zero node and never joins here — that's the honest
  * outcome for a vault the wizard hasn't linked to a Sepolia org yet, not a bug to hide.

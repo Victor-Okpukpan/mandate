@@ -3,7 +3,7 @@ import { createPublicClient, http, type Address } from "viem";
 import type { PrivyClient } from "@privy-io/node";
 import type { PrivateKeyAccount } from "viem/accounts";
 import { ArcVaultFactoryAbi, MandateAnchorAbi, MandateOrgFactoryAbi, MandateRegistrarAbi } from "@mandate/shared/abis";
-import { listOrgs, listVaults, joinOrgVaults, type OrgWithVault } from "@mandate/shared/orgs";
+import { listOrgs, listVaultsForAdmins, joinOrgVaults, type OrgWithVault } from "@mandate/shared/orgs";
 import { loadFactories, MAX_STALENESS_SECONDS } from "./config.js";
 import { startWatcher, type WatcherDeps } from "./watcher.js";
 import { startHeartbeatLoop } from "./heartbeat.js";
@@ -111,10 +111,17 @@ export async function startOrgSupervisor(deps: SupervisorDeps) {
   const arcClient = createPublicClient({ chain: arcTestnet, transport: http(rpc.arc) });
 
   console.log(`[supervisor] backfilling orgs from ${orgFactory} and vaults from ${vaultFactory}`);
-  const [orgs, vaults] = await Promise.all([
-    listOrgs(sepoliaClient, orgFactory, orgFactoryFromBlock),
-    listVaults(arcClient, vaultFactory, vaultFactoryFromBlock),
-  ]);
+  const orgs = await listOrgs(sepoliaClient, orgFactory, orgFactoryFromBlock);
+  // Not `listVaults` (an Arc `eth_getLogs` backfill) — Arc's public RPC rejects that outright at
+  // any range wide enough to matter. Read vaults by direct call instead, scoped to the admins
+  // `listOrgs` already found on Sepolia (which works fine there).
+  const vaultFromBlock = vaultFactoryFromBlock === "earliest" ? 0n : vaultFactoryFromBlock;
+  const vaults = await listVaultsForAdmins(
+    arcClient,
+    vaultFactory,
+    orgs.map((o) => o.admin),
+    vaultFromBlock,
+  );
   const joined = joinOrgVaults(orgs, vaults);
   console.log(`[supervisor] found ${orgs.length} org(s), ${vaults.length} vault(s), ${joined.filter((o) => o.vault).length} joined`);
 

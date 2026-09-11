@@ -4,9 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import { usePublicClient, useWatchContractEvent } from "wagmi";
 import { sepolia, arcTestnet } from "viem/chains";
 import type { Address } from "viem";
-import { ArcVaultFactoryAbi, MandateOrgFactoryAbi } from "@mandate/shared/abis";
+import { MandateOrgFactoryAbi } from "@mandate/shared/abis";
 import { getContractEventsChunked } from "@mandate/shared/eventLogs";
-import { joinOrgVaults, type Org, type Vault } from "@mandate/shared/orgs";
+import { joinOrgVaults, listVaultsForAdmins, type Org, type Vault } from "@mandate/shared/orgs";
 import { getDeployedAddresses } from "./addresses";
 
 const ORG_FACTORY_DEPLOY_BLOCK = process.env.NEXT_PUBLIC_MANDATE_ORG_FACTORY_DEPLOY_BLOCK
@@ -122,61 +122,16 @@ export function useOrgs() {
     if (!arcClient || admins.length === 0) return;
     let cancelled = false;
 
-    // Public RPCs 429 under the app's watch/backfill load; a dropped vault read would otherwise
-    // read as "org has no vault" and bounce the user out. Retry with backoff, and only mark the
-    // check *confirmed* on a fully clean pass — OrgGuard trusts `vaultsConfirmed`, not a guess.
-    async function readWithRetry<T>(fn: () => Promise<T>, tries = 4): Promise<T> {
-      let lastErr: unknown;
-      for (let i = 0; i < tries; i++) {
-        try {
-          return await fn();
-        } catch (e) {
-          lastErr = e;
-          await new Promise((r) => setTimeout(r, 400 * 2 ** i));
-        }
-      }
-      throw lastErr;
-    }
-
+    // `listVaultsForAdmins` already retries each call — a dropped read here would otherwise read
+    // as "org has no vault" and bounce the user out. Only mark the check *confirmed* on a fully
+    // clean pass — OrgGuard trusts `vaultsConfirmed`, not a guess.
     async function load() {
-      const anchorLists = await Promise.all(
-        admins.map((admin) =>
-          readWithRetry(() =>
-            arcClient!.readContract({
-              address: addresses.arcVaultFactory!,
-              abi: ArcVaultFactoryAbi,
-              functionName: "vaultsOfAdmin",
-              args: [admin],
-            }),
-          ),
-        ),
-      );
-      const anchors = Array.from(new Set(anchorLists.flat()));
-      const details = await Promise.all(
-        anchors.map((anchor) =>
-          readWithRetry(() =>
-            arcClient!.readContract({
-              address: addresses.arcVaultFactory!,
-              abi: ArcVaultFactoryAbi,
-              functionName: "vaults",
-              args: [anchor],
-            }),
-          ),
-        ),
-      );
+      // `vaults().createdAt` is a block.timestamp, not a block number — the factory deploy block
+      // is the only safe `fromBlock` floor available without an Arc log query.
+      const fallbackBlock = VAULT_FACTORY_DEPLOY_BLOCK === "earliest" ? 0n : VAULT_FACTORY_DEPLOY_BLOCK;
+      const result = await listVaultsForAdmins(arcClient!, addresses.arcVaultFactory!, admins, fallbackBlock);
       if (cancelled) return;
-      setVaults(
-        details.map((d) => ({
-          anchor: d[0],
-          treasury: d[1],
-          admin: d[2],
-          enforcer: "0x0000000000000000000000000000000000000000" as Address,
-          orgRootNode: d[3],
-          // `vaults().createdAt` is a block.timestamp, not a block number — the factory deploy
-          // block is the only safe lower bound available without an Arc log query.
-          createdAtBlock: VAULT_FACTORY_DEPLOY_BLOCK === "earliest" ? 0n : VAULT_FACTORY_DEPLOY_BLOCK,
-        })),
-      );
+      setVaults(result);
       setVaultsChecked(true);
       setVaultsConfirmed(true);
     }
