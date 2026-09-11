@@ -30,7 +30,8 @@ export default function DocsOverviewPage() {
         Every mandate lives under an organisation&rsquo;s own ENSv2 registry — its own name, its
         own admin, its own registrar that nobody else, including this site, can issue under.
         &ldquo;Launch app&rdquo; opens the org directory; &ldquo;Create an organisation&rdquo;
-        starts the wizard. Concretely:
+        starts one gated wizard that doesn&rsquo;t let you reach the dashboard until it&rsquo;s
+        done. Six steps, in order:
       </p>
       <ol>
         <li>
@@ -39,40 +40,43 @@ export default function DocsOverviewPage() {
           issue or revoke a mandate under it afterward.
         </li>
         <li>
-          <strong>Choose a name.</strong> A label — <code>acme</code> for <code>acme.eth</code> —
-          checked for real availability and priced live against ENSv2&rsquo;s own
+          <strong>Name.</strong> A label — <code>acme</code> for <code>acme.eth</code> — checked
+          for real availability and priced live against ENSv2&rsquo;s own{" "}
           <code>getRegisterPrice</code>, the same call a taken name reverts against.
         </li>
         <li>
-          <strong>Preflight.</strong> Three real balance checks, not assumptions: Sepolia ETH for
+          <strong>Add funds.</strong> Three real balance checks, not assumptions: Sepolia ETH for
           gas, Sepolia USDC for the registration price, Arc USDC for the vault you&rsquo;ll create
-          next. Each row links straight to a faucet if it&rsquo;s short.
+          next. Each row links straight to a faucet if it&rsquo;s short, and the wizard won&rsquo;t
+          advance until all three clear.
         </li>
         <li>
-          <strong>Create the organisation.</strong> ENSv2 registers names through a commit-reveal
-          — a real, enforced wait between reserving the name and finalizing it, shown as a
-          countdown, not hidden behind a spinner. Once it clears, one transaction mints the name
-          and deploys the org&rsquo;s own registrar.
+          <strong>Register.</strong> ENSv2 registers names through a commit-reveal — a real,
+          enforced wait between reserving the name and finalizing it, shown as a countdown, not
+          hidden behind a spinner. Once it clears, one transaction mints the name and deploys the
+          org&rsquo;s own registrar.
         </li>
         <li>
-          <strong>Create the Arc vault.</strong> A second, separate deploy — the org&rsquo;s
+          <strong>Arc vault.</strong> A second, separate deploy — the org&rsquo;s{" "}
           <code>MandateAnchor</code> and <code>AgentTreasury</code> on Arc, signed for by an
           Enforcer key. The platform default is prefilled; an org running its own Enforcer
           overrides it here.
+        </li>
+        <li>
+          <strong>First agent.</strong> The same short form described below — name, budget,
+          per-tx cap, expiry, allowlist. Finishing this step is what ends the wizard: you land on
+          the dashboard with a live agent already in the tree, not an empty page.
         </li>
       </ol>
       <p>
         One honest gap: this wizard talks to <code>MandateOrgFactory</code> and{" "}
         <code>ArcVaultFactory</code> — two contracts deployed once per platform instance, not per
         organisation. Until an operator has run that one-time deploy, the wizard shows &ldquo;org
-        factory not configured&rdquo; instead of the steps above, and the only organisation that
-        exists is whichever one was seeded directly.
+        factory not configured&rdquo; instead of the steps above.
       </p>
 
-      <h2>Using an existing organisation</h2>
-      <p>
-        Concretely, in order, with nothing skipped:
-      </p>
+      <h2>Registering another agent</h2>
+      <p>Once an organisation exists, adding an agent to it is short:</p>
       <ol>
         <li>
           <strong>Sign in.</strong> &ldquo;Launch app&rdquo; opens the dashboard and asks for an
@@ -80,22 +84,17 @@ export default function DocsOverviewPage() {
           No wallet or seed phrase required to sign in.
         </li>
         <li>
-          <strong>Provision an agent.</strong> On the &ldquo;Issue mandate&rdquo; page, click
-          &ldquo;Provision a wallet&rdquo; before filling anything else in. This creates a real
-          Privy server wallet for the agent — its own address, holding its own keys, that you
-          never see or manage directly.
+          <strong>Register agent.</strong> Name it, set a budget, a per-transaction cap, an
+          expiry, and at least one allowlisted recipient address, then submit. A real Privy server
+          wallet is provisioned for it automatically in the same step — its own address, holding
+          its own keys, that you never see or manage directly — and the mandate is written to
+          Sepolia as an ENS subname in one signature.
         </li>
         <li>
-          <strong>Set its limits and issue.</strong> Fill in a budget, a per-transaction cap, an
-          expiry, and at least one allowlisted recipient address, then sign the issue
-          transaction in your own wallet. This writes the mandate to Sepolia as an ENS subname —
-          the panel on the right shows the exact records that transaction will create, live, as
-          you type.
-        </li>
-        <li>
-          <strong>Watch it land.</strong> The new mandate appears in the tree on the dashboard
-          home page. Click it to open its detail view — the ENS records, its Arc-side state, and
-          (once an Enforcer has synced it) the actual Privy policy guarding its wallet.
+          <strong>Watch it land.</strong> The dashboard returns you to the tree the instant the
+          transaction confirms — the new agent is already there. Click it to open its detail view:
+          plain-language terms, the ENS records behind them, its Arc-side state, and (once an
+          Enforcer has synced it) the actual Privy policy guarding its wallet.
         </li>
         <li>
           <strong>Revoke it.</strong> The detail view has a &ldquo;Revoke this mandate&rdquo;
@@ -106,9 +105,9 @@ export default function DocsOverviewPage() {
       <p>
         One honest gap: syncing a freshly-issued mandate onto Arc and attaching its Privy policy
         is done by a separate background service, the Enforcer — not something a visitor clicks a
-        button for in this UI. On a self-run deployment that service has to be running for steps 4
-        and 5 to show live Arc/Privy state; until then, a mandate exists and is fully real on
-        Sepolia, but its money-plane enforcement hasn&rsquo;t been mirrored yet.
+        button for in this UI. That service has to be running for the drawer to show live Arc/Privy
+        state; until then, a mandate exists and is fully real on Sepolia, but its money-plane
+        enforcement hasn&rsquo;t been mirrored yet.
       </p>
 
       <h2>The problem</h2>
@@ -133,8 +132,9 @@ export default function DocsOverviewPage() {
         <li>No renew role → the name expires on schedule, and the agent cannot extend it.</li>
         <li>The parent retains the unregister role → the org can always kill it.</li>
         <li>
-          Per-key resolver permissions → the agent can write its own <code>agent.status</code>{" "}
-          and <code>agent.heartbeat</code>, and nothing under <code>mandate.*</code>.
+          Per-key resolver permissions → the agent can write its own <code>agent.status</code>,{" "}
+          <code>agent.heartbeat</code>, and <code>agent.output.last</code>, and nothing under{" "}
+          <code>mandate.*</code>.
         </li>
       </ul>
       <p>

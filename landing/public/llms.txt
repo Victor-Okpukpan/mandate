@@ -6,12 +6,13 @@ MANDATE is built on three planes: authority (ENSv2 on Sepolia), enforcement (an 
 
 ## Docs
 
-- [How MANDATE works](https://runmandate.xyz/docs): The three-plane model end to end, plus how to actually use the dashboard — sign in, provision an agent, issue a mandate, revoke it.
+- [How MANDATE works](https://runmandate.xyz/docs): The three-plane model end to end, plus how to actually use the app — self-serve org onboarding through a gated wizard, registering an agent, revoking it.
 - [ENS subnames as agent permissions](https://runmandate.xyz/docs/ens): Why a mandate is an ENSv2 subname with specific roles withheld — soulbound (no transfer-admin), self-expiring (no renew), narrowing-only sub-delegation.
 - [Privy wallet policies, and their limits](https://runmandate.xyz/docs/privy): What Privy's conditional policies enforce for an agent's spending, and why their limits (private to one app, ~10 rolling aggregations, post-hoc updates) still need an onchain ledger alongside them.
 - [Arc: USDC-gas payments for agents](https://runmandate.xyz/docs/arc): The org treasury as a revolving USDC credit facility on Arc, and how ERC-8004 identity/reputation and ERC-8183 job escrow compose into it.
 - [Architecture](https://runmandate.xyz/docs/architecture): The authority/enforcement/money split in full, and what changed from the original single-chain design.
-- [Security model and known limitations](https://runmandate.xyz/docs/security): The threat model, the Enforcer's own trust assumptions, and every known limitation disclosed rather than hidden.
+- [Security model and known limitations](https://runmandate.xyz/docs/security): The threat model, the Enforcer's own trust assumptions, and every known limitation disclosed rather than hidden — including where Privy's own chain authorization currently stops short.
+- [Roadmap](https://runmandate.xyz/docs/roadmap): What this version deliberately leaves out — agent-to-agent commerce via ERC-8183 jobs, sub-delegation in the UI, wallet-ownership quorums as a first-class step.
 
 ## Optional
 

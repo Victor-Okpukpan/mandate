@@ -66,6 +66,22 @@ export default function SecurityDocsPage() {
         deliberately kept independent of. Flagged here rather than assumed silently correct.
       </Callout>
 
+      <h2>Arc isn&rsquo;t yet on Privy&rsquo;s per-app relay allowlist</h2>
+      <p>
+        Verified live, not assumed: Privy&rsquo;s Wallet API authorizes which chains an app may
+        call <code>eth_sendTransaction</code> on, and Arc testnet isn&rsquo;t on that list for this
+        app yet — it 401s with <code>App is not authorized to transact on chain
+        eip155:5042002</code>. <code>eth_signTransaction</code> sits on the other side of that
+        gate, since it never touches the network, so <code>agents/shared/src/signer.ts</code>{" "}
+        builds the Arc transaction itself, has Privy sign it, and broadcasts the raw bytes via
+        Arc&rsquo;s own RPC. The private key never leaves Privy&rsquo;s custody; only the broadcast
+        step moves. This is the one place a mandate&rsquo;s Privy wallet policy currently has to be
+        detached to demo an Arc payment end to end, since Privy&rsquo;s policy engine can&rsquo;t
+        evaluate a condition against a chain it hasn&rsquo;t authorized either — on-chain
+        enforcement (<code>AgentTreasury</code>/<code>MandateAnchor</code>) still runs
+        unaffected. Drop the workaround the moment Arc is added to that allowlist.
+      </p>
+
       <h2>Centralization, disclosed rather than hidden</h2>
       <p>
         Every contract&rsquo;s owner-gated function — <code>MandateRegistrar</code>&rsquo;s org

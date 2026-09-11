@@ -55,8 +55,9 @@ export default function EnsDocsPage() {
       <p>
         Each mandate gets its own dedicated <code>PermissionedResolver</code> instance.{" "}
         <code>authorizeTextRoles(name, "agent.status", agentWallet, true)</code> grants exactly
-        that key — not the whole name, not a set of keys. The agent can report <code>agent.status</code>{" "}
-        and <code>agent.heartbeat</code>; it is cryptographically incapable of writing{" "}
+        that key — not the whole name, not a set of keys. The agent can report{" "}
+        <code>agent.status</code>, <code>agent.heartbeat</code>, and{" "}
+        <code>agent.output.last</code>; it is cryptographically incapable of writing{" "}
         <code>mandate.budget.total</code>, verified directly against the live ENSv2 Sepolia
         deployment.
       </p>
