@@ -42,16 +42,16 @@ export function ProductShot() {
       <div className="overflow-hidden rounded-xl border border-border bg-surface shadow-xl">
         <WindowChrome url="app.runmandate.xyz" />
         <div className="flex items-center justify-between px-4 py-3">
-          <span className="font-mono text-[11px] text-tertiary">mandate.eth</span>
+          <span className="font-mono text-[11px] text-tertiary">acme.eth</span>
           <span className="rounded-md bg-accent px-2.5 py-1 font-mono text-[10px] font-medium text-on-accent">
-            Issue mandate
+            Register agent
           </span>
         </div>
         <div className="grid grid-cols-3 gap-px bg-border-subtle px-4 pb-2">
           {[
             ["Live", "1"],
             ["Revoked", "1"],
-            ["Total issued", "2"],
+            ["Total", "2"],
           ].map(([label, value]) => (
             <div key={label} className="bg-surface py-2">
               <p className="font-mono text-[10px] uppercase tracking-label text-tertiary">{label}</p>
@@ -60,8 +60,8 @@ export function ProductShot() {
           ))}
         </div>
         <div className="mt-1">
-          <MandateRow name="research.mandate.eth" state="live" budget="312 / 500 USDC" />
-          <MandateRow name="ops.mandate.eth" state="revoked" budget="0 / 500 USDC" />
+          <MandateRow name="researcher.acme.eth" state="live" budget="$312 of $500" />
+          <MandateRow name="ops.acme.eth" state="revoked" budget="$0 of $500" />
         </div>
         {/* Blank floor, not decorative filler — gives the front panel below somewhere to overlap
             that isn't a row of actual data. Without this the front card's top edge lands right on
