@@ -9,6 +9,7 @@
     "node": ">=20"
   },
   "scripts": {
+    "postinstall": "pnpm --filter mandate-agent-sdk run build",
     "lint": "pnpm -r --if-present run lint",
     "build": "pnpm -r --if-present run build",
     "test": "pnpm -r --if-present run test",

@@ -6,7 +6,7 @@
   "license": "MIT",
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "pnpm --filter mandate-agent-sdk run build && next build",
     "start": "next start",
     "lint": "tsc --noEmit"
   },
