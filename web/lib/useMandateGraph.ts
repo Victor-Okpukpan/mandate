@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { usePublicClient, useWatchContractEvent } from "wagmi";
 import { sepolia } from "viem/chains";
 import { MandateRegistrarAbi } from "@mandate/shared/abis";
-import { getContractEventsChunked } from "@mandate/shared/eventLogs";
 import type { Address, Hex } from "viem";
 
 export type MandateState = "live" | "expiring" | "revoked" | "stale";
@@ -23,35 +22,25 @@ const ROOT_PARENT = ("0x" + "0".repeat(64)) as Hex;
 const EXPIRING_WINDOW_SECONDS = 24 * 60 * 60; // within 24h of expiry reads as "expiring"
 
 /**
- * Fallback starting point when a caller doesn't know the registrar's own creation block — the
- * single-org env var, for the pre-factory registrar. Callers that DO know it (every org read from
- * `useOrgs()` carries its own `createdAtBlock`) should pass that instead via `fromBlock` — it's
- * both a tighter bound and, unlike this fixed env var, correct for a registrar created after this
- * value. Either way the real fix against the range cap is `getContractEventsChunked` below, not
- * the starting point alone — see that function's own NatSpec: a fixed starting point still
- * eventually exceeds a public RPC's per-call `eth_getLogs` range cap as "latest" grows; only
- * chunking makes this never fail regardless of how far back it has to reach.
- */
-const REGISTRAR_DEPLOY_BLOCK = process.env.NEXT_PUBLIC_MANDATE_REGISTRAR_DEPLOY_BLOCK
-  ? BigInt(process.env.NEXT_PUBLIC_MANDATE_REGISTRAR_DEPLOY_BLOCK)
-  : "earliest";
-
-/**
- * Event-sourced authority graph — no indexer, per the stack's own philosophy. Backfills every
- * MandateIssued/MandateAmended/MandateRevoked log on mount via `getContractEvents`, then
- * subscribes with `useWatchContractEvent` for everything after. State is derived from what the
- * registrar itself has emitted, nothing cached server-side.
+ * Authority graph, read by direct contract state — `mandateCount()` + `nodesPaginated()` +
+ * `getMandate(node)` per node — not `MandateIssued`/`MandateAmended`/`MandateRevoked` logs. A
+ * public, multi-tenant Sepolia RPC has been observed to silently and *persistently* drop a real,
+ * existing historical log (not a transient flake — a full chunked sweep back to genesis still
+ * missed it), which made an actually-issued mandate invisible here even though it read back fine
+ * from the contract directly. `useWatchContractEvent` below still watches events live for a
+ * same-session "appears without a reload" feel, and the 15s re-poll is what actually guarantees
+ * correctness if that live subscription hits the same failure mode — see `useOrgs`'s matching fix
+ * and NatSpec for the org-level version of this same problem.
  *
  * "Stale" (the Enforcer-liveness state, distinct from an expired mandate) isn't derivable from
- * these events alone — it needs each node's Arc-side `MandateAnchor.updatedAt`, read separately
+ * Sepolia state alone — it needs each node's Arc-side `MandateAnchor.updatedAt`, read separately
  * per agent wallet. This hook reports live/expiring/revoked from Sepolia only; the page composes
  * the Arc-side staleness check on top.
  */
-export function useMandateGraph(registrarAddress: Address | undefined, fromBlock?: bigint) {
+export function useMandateGraph(registrarAddress: Address | undefined, _fromBlock?: bigint) {
   const [nodes, setNodes] = useState<Map<Hex, MandateNode>>(new Map());
   const [loading, setLoading] = useState(true);
   const publicClient = usePublicClient({ chainId: sepolia.id });
-  const backfillFrom = fromBlock ?? REGISTRAR_DEPLOY_BLOCK;
 
   useEffect(() => {
     if (!registrarAddress || !publicClient) {
@@ -60,72 +49,63 @@ export function useMandateGraph(registrarAddress: Address | undefined, fromBlock
     }
     let cancelled = false;
 
-    async function backfill() {
-      setLoading(true);
-      const [issuedLogs, amendedLogs, revokedLogs] = await Promise.all([
-        getContractEventsChunked(publicClient!, {
-          address: registrarAddress!,
-          abi: MandateRegistrarAbi,
-          eventName: "MandateIssued",
-          fromBlock: backfillFrom,
-        }),
-        getContractEventsChunked(publicClient!, {
-          address: registrarAddress!,
-          abi: MandateRegistrarAbi,
-          eventName: "MandateAmended",
-          fromBlock: backfillFrom,
-        }),
-        getContractEventsChunked(publicClient!, {
-          address: registrarAddress!,
-          abi: MandateRegistrarAbi,
-          eventName: "MandateRevoked",
-          fromBlock: backfillFrom,
-        }),
-      ]);
+    async function load() {
+      const count = await publicClient!.readContract({
+        address: registrarAddress!,
+        abi: MandateRegistrarAbi,
+        functionName: "mandateCount",
+      });
+      if (count === 0n) {
+        if (!cancelled) setLoading(false);
+        return;
+      }
+
+      const nodeHashes = await publicClient!.readContract({
+        address: registrarAddress!,
+        abi: MandateRegistrarAbi,
+        functionName: "nodesPaginated",
+        args: [0n, count],
+      });
+
+      const mandates = await Promise.all(
+        nodeHashes.map((node) =>
+          publicClient!.readContract({
+            address: registrarAddress!,
+            abi: MandateRegistrarAbi,
+            functionName: "getMandate",
+            args: [node],
+          }),
+        ),
+      );
 
       if (cancelled) return;
 
       setNodes((prev) => {
         const next = new Map(prev);
-        for (const log of issuedLogs) {
-          const { node, parentNode, agentWallet, resolver, expiry } = log.args as {
-            node: Hex;
-            parentNode: Hex;
-            agentWallet: Address;
-            resolver: Address;
-            expiry: bigint;
-          };
-          next.set(node, {
-            node,
-            parentNode: parentNode === ROOT_PARENT ? null : parentNode,
-            agentWallet,
-            resolver,
-            expiry,
-            revoked: false,
+        for (const m of mandates) {
+          next.set(m.node, {
+            node: m.node,
+            parentNode: m.parentNode === ROOT_PARENT ? null : m.parentNode,
+            agentWallet: m.agentWallet,
+            resolver: m.resolver,
+            expiry: m.terms.expiry,
+            revoked: m.revoked,
           });
-        }
-        // Applied after MandateIssued so an amendment's expiry always wins over the original —
-        // both event kinds can appear for the same node within this single backfill window.
-        for (const log of amendedLogs) {
-          const { node, expiry } = log.args as { node: Hex; expiry: bigint };
-          const existing = next.get(node);
-          if (existing) next.set(node, { ...existing, expiry });
-        }
-        for (const log of revokedLogs) {
-          const { node } = log.args as { node: Hex };
-          const existing = next.get(node);
-          if (existing) next.set(node, { ...existing, revoked: true });
         }
         return next;
       });
       setLoading(false);
     }
 
-    backfill().catch(() => setLoading(false));
+    load().catch(() => setLoading(false));
+    // Same reasoning as `useOrgs`'s vault poll: a dropped or flaky RPC read must resolve on its
+    // own shortly after, not require a manual page reload.
+    const id = setInterval(() => load().catch(() => {}), 15_000);
     return () => {
       cancelled = true;
+      clearInterval(id);
     };
-  }, [registrarAddress, publicClient, backfillFrom]);
+  }, [registrarAddress, publicClient]);
 
   useWatchContractEvent({
     address: registrarAddress,

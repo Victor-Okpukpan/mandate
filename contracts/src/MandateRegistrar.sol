@@ -140,6 +140,10 @@ contract MandateRegistrar is Ownable2Step, ReentrancyGuardTransient {
     /// @dev A node's OWN sub-registry, once it has attenuated at least one child. Unset (zero
     ///      address) until then.
     mapping(bytes32 node => IUserRegistry) public subRegistryOf;
+    /// @dev Every node this registrar has ever issued, insertion order — the only on-chain way to
+    ///      enumerate mandates without `MandateIssued` logs, which a public RPC has been observed
+    ///      to silently drop for real, existing ranges. See `mandateCount`/`nodesPaginated` below.
+    bytes32[] public allNodes;
 
     uint256 private _saltCounter;
 
@@ -258,6 +262,7 @@ contract MandateRegistrar is Ownable2Step, ReentrancyGuardTransient {
             arcWallet,
             allowHumanJson
         );
+        allNodes.push(node);
     }
 
     /// @notice Delegate a narrower mandate to a sub-agent. Self-service: callable by the parent
@@ -313,6 +318,7 @@ contract MandateRegistrar is Ownable2Step, ReentrancyGuardTransient {
             arcWallet,
             allowHumanJson
         );
+        allNodes.push(node);
 
         parent.committed += narrowed.budgetTotal;
     }
@@ -470,6 +476,27 @@ contract MandateRegistrar is Ownable2Step, ReentrancyGuardTransient {
     function orgRootDnsEncoded() external view returns (bytes memory) {
         return _orgRootDnsEncoded;
     }
+
+    /// @notice Total mandates ever issued under this registrar — direct children and attenuated
+    ///         sub-agents alike. Enumerate the tree with this + `nodesPaginated` instead of reading
+    ///         `MandateIssued` logs, which don't need to be reliable for the tree to be readable.
+    function mandateCount() external view returns (uint256) {
+        return allNodes.length;
+    }
+
+    /// @notice A page of `allNodes`, oldest first — mirrors `MandateOrgFactory.registrarsPaginated`.
+    ///         Clamps `limit` to the remaining length rather than reverting past the end.
+    function nodesPaginated(uint256 offset, uint256 limit) external view returns (bytes32[] memory page) {
+        uint256 total = allNodes.length;
+        if (offset >= total) return new bytes32[](0);
+        uint256 end = offset + limit;
+        if (end > total) end = total;
+        page = new bytes32[](end - offset);
+        for (uint256 i = offset; i < end; i++) {
+            page[i - offset] = allNodes[i];
+        }
+    }
+
 
     /*//////////////////////////////////////////////////////////////
                     INTERNAL STATE-CHANGING FUNCTIONS
