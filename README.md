@@ -193,9 +193,14 @@ Source-verified where noted — explorer links go straight to the readable contr
 
 | Contract | Chain | Address |
 | --- | --- | --- |
-| `MandateOrgFactory` | Sepolia (11155111) | [`0xC15F98e14860e34C2CCD1640a699329Cf7F35009`](https://sepolia.etherscan.io/address/0xC15F98e14860e34C2CCD1640a699329Cf7F35009) |
-| `MandateRegistrarDeployer` | Sepolia (11155111) | [`0x0bd9De82616D74C791f1D421595E414cea43c05E`](https://sepolia.etherscan.io/address/0x0bd9De82616D74C791f1D421595E414cea43c05E) |
+| `MandateOrgFactory` | Sepolia (11155111) | [`0x0CBD5A86640C86860F87A4058879FD19d79B22F7`](https://sourcify.dev/#/lookup/0x0CBD5A86640C86860F87A4058879FD19d79B22F7) ([Etherscan](https://sepolia.etherscan.io/address/0x0CBD5A86640C86860F87A4058879FD19d79B22F7)) |
+| `MandateRegistrarDeployer` | Sepolia (11155111) | [`0x03202F8A3D4e0Af034De0532398Ad8D0c12622c9`](https://sourcify.dev/#/lookup/0x03202F8A3D4e0Af034De0532398Ad8D0c12622c9) ([Etherscan](https://sepolia.etherscan.io/address/0x03202F8A3D4e0Af034De0532398Ad8D0c12622c9)) |
 | `ArcVaultFactory` | Arc testnet (5042002) | [`0xcF409d76298b7A63F2F2AC9171F58894BEf5894C`](https://testnet.arcscan.app/address/0xcF409d76298b7A63F2F2AC9171F58894BEf5894C?tab=contract) |
+
+`MandateOrgFactory`/`MandateRegistrarDeployer` were redeployed to add on-chain mandate enumeration
+(`mandateCount`/`nodesPaginated` on every `MandateRegistrar`) — see "Design decisions" below. Both
+verified exact-match on Sourcify; Etherscan's own verification is pending only because Sourcify's
+shared relay hit its daily submission cap at the time, not because the source differs.
 
 Every org's own `MandateRegistrar` (Sepolia) and `MandateAnchor`/`AgentTreasury` pair (Arc) are
 deployed by the two factories above at onboarding time — discovered live from `OrgCreated` /
@@ -228,6 +233,12 @@ the relevant contract's own NatSpec and at `/docs/architecture`:
 6. **Arc payments sign-then-broadcast instead of one-call `sendTransaction`.** See the Privy section
    above — a real, live-confirmed gap in Privy's per-app chain relay authorization, not a design
    choice; the workaround is isolated to `agents/shared/src/signer.ts`.
+7. **`MandateRegistrar` enumerates its own mandates on-chain (`mandateCount`/`nodesPaginated`),
+   not just via `MandateIssued` logs.** A public Sepolia RPC was observed to silently and
+   persistently drop a real, existing historical log for one specific mandate — not a range-cap
+   error, just a wrong empty result, confirmed by a full chunked sweep back to the registrar's own
+   deploy block. The dashboard's mandate tree and org directory now read live contract state
+   instead, the same fix already applied to Arc vault discovery in point 5 above.
 
 Full known-limitations list, honestly stated rather than left for a judge to find, at
 `/docs/security`. Deferred scope (agent-to-agent jobs, sub-delegation UI, quorum onboarding as a
