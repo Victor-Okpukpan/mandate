@@ -194,6 +194,20 @@ export async function syncPolicyForWallet(
  * policy down to a bare `DENY *`; does nothing (silently) if the wallet was never given a policy,
  * since there's nothing to close off.
  */
+/**
+ * Strips a wallet's policy entirely, if it has one — the counterpart to `syncPolicyForWallet` for
+ * when `PRIVY_POLICY_SYNC_ENABLED` is off (see its own doc comment in `config.ts`). A wallet with a
+ * policy attached cannot sign on Arc at all right now, good payments included, so a leftover
+ * policy from before this was known (or from the flag being flipped) has to come off for the
+ * wallet to work. No-ops silently if there's nothing to remove.
+ */
+export async function detachPolicyIfPresent(privy: PrivyClient, walletId: string): Promise<boolean> {
+  const wallet = await privy.wallets().get(walletId);
+  if (!wallet.policy_ids || wallet.policy_ids.length === 0) return false;
+  await privy.wallets().update(walletId, { policy_ids: [] });
+  return true;
+}
+
 export async function revokePolicyForWallet(
   privy: PrivyClient,
   walletId: string,

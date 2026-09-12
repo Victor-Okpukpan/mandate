@@ -100,3 +100,19 @@ export function loadFactories() {
  *  `MandateAnchor` was deployed with. The heartbeat loop fires at a third of this. */
 export const MAX_STALENESS_SECONDS = Number(process.env.ENFORCER_MAX_STALENESS_SECONDS ?? 900);
 export const HEARTBEAT_INTERVAL_MS = (MAX_STALENESS_SECONDS / 3) * 1000;
+
+/**
+ * Off by default — verified live (see `/docs/security`): Arc testnet isn't yet on Privy's per-app
+ * relay allowlist, and attaching ANY conditional policy to a wallet blocks it from signing
+ * `eth_signTransaction` on Arc at all, regardless of what the policy's conditions say. Every real
+ * payment this system makes is an Arc transaction, so a Privy-policy-protected agent wallet
+ * currently cannot pay — not "cannot pay outside its mandate," cannot pay at all. Attaching the
+ * policy would brick the one thing an agent wallet exists to do.
+ *
+ * With this off, `watcher.ts` strips any leftover policy instead of attaching one, and on-chain
+ * enforcement (`MandateAnchor.assertSpend` / `AgentTreasury.payTo`) is the sole enforcement layer
+ * for Arc payments — still fully real, still fails closed, still the thing that actually reverts a
+ * bad payment. Flip this back on the moment Privy authorizes Arc for this app; nothing else about
+ * the sync logic needs to change.
+ */
+export const PRIVY_POLICY_SYNC_ENABLED = process.env.ENFORCER_PRIVY_POLICY_SYNC === "true";

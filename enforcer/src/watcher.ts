@@ -5,7 +5,8 @@ import { MandateAnchorAbi, MandateRegistrarAbi, PermissionedResolverAbi } from "
 import { MANDATE_KEYS } from "@mandate/shared/ensKeys";
 import { parseAllowHuman } from "@mandate/shared/allowHuman";
 import { getContractEventsChunked } from "@mandate/shared/eventLogs";
-import { revokePolicyForWallet, syncPolicyForWallet } from "./privyPolicy.js";
+import { detachPolicyIfPresent, revokePolicyForWallet, syncPolicyForWallet } from "./privyPolicy.js";
+import { PRIVY_POLICY_SYNC_ENABLED } from "./config.js";
 import { makeArcClients, submitSync, type SyncPayload } from "./arcSync.js";
 import type { WalletCache } from "./walletCache.js";
 import type { PrivateKeyAccount } from "viem/accounts";
@@ -120,6 +121,16 @@ export async function startWatcher(deps: WatcherDeps) {
     }
     if (!walletId) {
       console.warn(`[privy] no Privy server wallet found for ${agent} — skipping policy sync`);
+      return;
+    }
+
+    if (!PRIVY_POLICY_SYNC_ENABLED) {
+      // See PRIVY_POLICY_SYNC_ENABLED's own doc comment in config.ts: any policy on a wallet
+      // blocks it from signing on Arc at all right now, so this strips a leftover one (from before
+      // that was known, or from the flag being flipped) instead of attaching/rewriting one. The
+      // on-chain anchor flip above is the real, sole enforcement for Arc payments while this is off.
+      const cleared = await detachPolicyIfPresent(deps.privy, walletId);
+      if (cleared) console.log(`[privy] policy sync disabled — cleared leftover policy on wallet ${walletId} (${agent})`);
       return;
     }
 

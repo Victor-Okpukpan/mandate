@@ -75,11 +75,21 @@ export default function SecurityDocsPage() {
         gate, since it never touches the network, so <code>agents/shared/src/signer.ts</code>{" "}
         builds the Arc transaction itself, has Privy sign it, and broadcasts the raw bytes via
         Arc&rsquo;s own RPC. The private key never leaves Privy&rsquo;s custody; only the broadcast
-        step moves. This is the one place a mandate&rsquo;s Privy wallet policy currently has to be
-        detached to demo an Arc payment end to end, since Privy&rsquo;s policy engine can&rsquo;t
-        evaluate a condition against a chain it hasn&rsquo;t authorized either — on-chain
-        enforcement (<code>AgentTreasury</code>/<code>MandateAnchor</code>) still runs
-        unaffected. Drop the workaround the moment Arc is added to that allowlist.
+        step moves. It runs into the same wall one layer up, though: Privy&rsquo;s policy engine
+        can&rsquo;t evaluate a condition against a chain it hasn&rsquo;t authorized either, so ANY
+        policy attached to a wallet blocks it from signing on Arc at all — not just non-compliant
+        payments, every payment. Since every real payment this system makes is an Arc transaction,
+        a policy-protected agent wallet currently cannot pay, full stop.
+      </p>
+      <p>
+        Rather than leave every agent wallet non-functional, <code>ENFORCER_PRIVY_POLICY_SYNC</code>{" "}
+        (off by default) governs this: the Enforcer stops attaching Privy policies and strips any
+        leftover ones instead, and on-chain enforcement (<code>MandateAnchor.assertSpend</code> /{" "}
+        <code>AgentTreasury.payTo</code>) becomes the sole layer for Arc payments in the meantime —
+        still fully real, still fails closed, still what actually reverts a bad payment; it&rsquo;s
+        the off-chain pre-filter that&rsquo;s sitting out, not the enforcement. Flip the flag to{" "}
+        <code>true</code> the moment Privy authorizes Arc for this app; nothing else about the
+        sync logic changes.
       </p>
 
       <h2>Centralization, disclosed rather than hidden</h2>
