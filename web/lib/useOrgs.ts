@@ -5,8 +5,7 @@ import { usePublicClient, useWatchContractEvent } from "wagmi";
 import { sepolia, arcTestnet } from "viem/chains";
 import type { Address } from "viem";
 import { MandateOrgFactoryAbi } from "@mandate/shared/abis";
-import { getContractEventsChunked } from "@mandate/shared/eventLogs";
-import { joinOrgVaults, listVaultsForAdmins, type Org, type Vault } from "@mandate/shared/orgs";
+import { joinOrgVaults, listOrgsDirect, listVaultsForAdmins, type Org, type Vault } from "@mandate/shared/orgs";
 import { getDeployedAddresses } from "./addresses";
 
 const ORG_FACTORY_DEPLOY_BLOCK = process.env.NEXT_PUBLIC_MANDATE_ORG_FACTORY_DEPLOY_BLOCK
@@ -17,17 +16,18 @@ const VAULT_FACTORY_DEPLOY_BLOCK = process.env.NEXT_PUBLIC_ARC_VAULT_FACTORY_DEP
   : "earliest";
 
 /**
- * The org directory — event-sourced from `MandateOrgFactory.OrgCreated` (Sepolia) and
- * `ArcVaultFactory.VaultCreated` (Arc), joined by `orgRootNode`, exactly like `useMandateGraph`
- * reads a mandate tree from nothing but the registrar's own logs. Backfills once (chunked — see
- * `@mandate/shared/eventLogs`'s own NatSpec on why a single unchunked call eventually fails
- * against a real RPC's `eth_getLogs` range cap), then `useWatchContractEvent`s both factories live
- * — an org onboarded through the wizard a moment ago appears here without a page reload, which is
- * the entire point of self-serve onboarding (see HOW-IT-WORKS.md §4's "OrgCreated makes the
- * Enforcer self-serve" — the same log this hook reads).
+ * The org directory — read live from `MandateOrgFactory` (Sepolia) and `ArcVaultFactory` (Arc),
+ * joined by `orgRootNode`. Orgs are discovered by direct contract-state read (`orgCount` +
+ * `registrarsPaginated` + `orgs(registrar)`, see `listOrgsDirect`), not `eth_getLogs` — a public,
+ * multi-tenant Sepolia RPC has been observed to silently return an empty log result for a real,
+ * existing range (no error, just `[]`), which made the entire directory look empty even though
+ * nothing on-chain had changed. `useWatchContractEvent` still watches both factories live for a
+ * same-session "org appears without a reload" feel, but the 15s re-poll below (matching the vault
+ * read's own polling) is what actually guarantees correctness if that watcher's log subscription
+ * hits the same flaky-RPC failure mode.
  *
- * No single-org fallback, deliberately — an org exists to this hook only if the factory logs say
- * it does, the same rule `enforcer/src/orgSupervisor.ts` enforces server-side. An org that predates
+ * No single-org fallback, deliberately — an org exists to this hook only if the factory says it
+ * does, the same rule `enforcer/src/orgSupervisor.ts` enforces server-side. An org that predates
  * the factory (or was seeded directly) is real on-chain but invisible here; that's the honest
  * outcome, not a bug to paper over with a synthesized entry.
  */
@@ -54,31 +54,24 @@ export function useOrgs() {
       return;
     }
     let cancelled = false;
+    const fallbackBlock = ORG_FACTORY_DEPLOY_BLOCK === "earliest" ? 0n : ORG_FACTORY_DEPLOY_BLOCK;
 
-    async function backfill() {
-      setOrgsLoading(true);
-      const logs = await getContractEventsChunked(sepoliaClient!, {
-        address: addresses.mandateOrgFactory!,
-        abi: MandateOrgFactoryAbi,
-        eventName: "OrgCreated",
-        fromBlock: ORG_FACTORY_DEPLOY_BLOCK,
-      });
+    async function load() {
+      const result = await listOrgsDirect(sepoliaClient!, addresses.mandateOrgFactory!, fallbackBlock);
       if (cancelled) return;
-      setOrgs(
-        logs.map((log) => ({
-          registrar: log.args.registrar!,
-          orgRootRegistry: log.args.orgRootRegistry!,
-          admin: log.args.admin!,
-          orgRootNode: log.args.orgRootNode!,
-          orgEnsName: log.args.orgEnsName!,
-          createdAtBlock: log.blockNumber,
-        })),
-      );
+      setOrgs(result);
       setOrgsLoading(false);
     }
-    backfill().catch((e) => console.warn("[useOrgs] backfill failed", e));
+    load().catch((e) => {
+      console.warn("[useOrgs] org read failed", e);
+      if (!cancelled) setOrgsLoading(false);
+    });
+    // Same reasoning as the vault poll below: a dropped or flaky RPC read must resolve on its own
+    // shortly after, not require a manual page reload.
+    const id = setInterval(() => load().catch(() => {}), 15_000);
     return () => {
       cancelled = true;
+      clearInterval(id);
     };
   }, [addresses.mandateOrgFactory, sepoliaClient]);
 

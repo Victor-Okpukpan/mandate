@@ -59,6 +59,53 @@ export async function listOrgs(
     .sort((a, b) => (a.createdAtBlock < b.createdAtBlock ? -1 : 1));
 }
 
+/**
+ * Same result as `listOrgs`, without ever calling `eth_getLogs` — reads `orgCount` +
+ * `registrarsPaginated` + `orgs(registrar)` directly instead. `eth_getLogs` against a public,
+ * multi-tenant RPC has been observed to silently return an empty result for a real, existing
+ * range — no error, just `[]` — which makes the entire org directory look empty even though
+ * nothing on-chain changed (the same failure mode `listVaultsForAdmins` below already routes
+ * around for Arc). This costs `orgCount + 2` calls instead of one log query, but only ever reads
+ * current contract state, which these same flaky endpoints keep serving correctly.
+ *
+ * `createdAtBlock` on the result is a floor, not a fact, same caveat as `listVaultsForAdmins`:
+ * the contract only stores a `createdAt` timestamp, not a block number, so `fallbackBlock` (the
+ * factory's own deploy block) is the only safe `fromBlock` a caller can hand to a later mandate
+ * log query for that org's own registrar.
+ */
+export async function listOrgsDirect(
+  client: PublicClient,
+  factory: Address,
+  fallbackBlock: bigint = 0n,
+): Promise<Org[]> {
+  const count = await client.readContract({ address: factory, abi: MandateOrgFactoryAbi, functionName: "orgCount" });
+  if (count === 0n) return [];
+
+  const registrars = await client.readContract({
+    address: factory,
+    abi: MandateOrgFactoryAbi,
+    functionName: "registrarsPaginated",
+    args: [0n, count],
+  });
+
+  const details = await Promise.all(
+    registrars.map((registrar) =>
+      client.readContract({ address: factory, abi: MandateOrgFactoryAbi, functionName: "orgs", args: [registrar] }),
+    ),
+  );
+
+  return details
+    .map((d) => ({
+      registrar: d[0],
+      orgRootRegistry: d[1],
+      admin: d[2],
+      orgRootNode: d[4],
+      orgEnsName: d[5],
+      createdAtBlock: fallbackBlock,
+    }))
+    .sort((a, b) => (a.orgEnsName < b.orgEnsName ? -1 : 1));
+}
+
 /** Every vault an `ArcVaultFactory` has ever created, oldest first. */
 export async function listVaults(
   client: PublicClient,
