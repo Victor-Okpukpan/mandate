@@ -3,6 +3,11 @@
  * ENS explicitly disqualifies hard-coded values — the verified addresses documented in
  * SPONSOR-NOTES live only in `.env.example`, never inlined here. Throws immediately, by name,
  * if a required var is missing, instead of silently resolving to `undefined` deep in a tx.
+ *
+ * Every field below is a `get` accessor, not a plain value: validating (and potentially throwing
+ * on) a field only when a caller actually reads it, rather than the whole struct up front — see
+ * `packages/agent-sdk/src/addresses.ts`'s matching NatSpec for why this matters for an external
+ * caller that only ever touches a handful of these fields.
  */
 import { type Address, isAddress } from "viem";
 
@@ -29,43 +34,81 @@ function optionalAddress(envVar: string): Address | undefined {
 /** ENSv2 (Sepolia) — authority plane. */
 export function getSepoliaAddresses() {
   return {
-    rootRegistry: requireAddress("SEPOLIA_ROOT_REGISTRY"),
-    ethRegistry: requireAddress("SEPOLIA_ETH_REGISTRY"),
-    ethRegistrar: requireAddress("SEPOLIA_ETH_REGISTRAR"),
-    userRegistryImpl: requireAddress("SEPOLIA_USER_REGISTRY_IMPL"),
-    permissionedResolverImpl: requireAddress("SEPOLIA_PERMISSIONED_RESOLVER_IMPL"),
-    universalResolverV2: requireAddress("SEPOLIA_UNIVERSAL_RESOLVER_V2"),
-    verifiableFactory: requireAddress("SEPOLIA_VERIFIABLE_FACTORY"),
-    rentPriceOracle: requireAddress("SEPOLIA_RENT_PRICE_ORACLE"),
+    get rootRegistry(): Address {
+      return requireAddress("SEPOLIA_ROOT_REGISTRY");
+    },
+    get ethRegistry(): Address {
+      return requireAddress("SEPOLIA_ETH_REGISTRY");
+    },
+    get ethRegistrar(): Address {
+      return requireAddress("SEPOLIA_ETH_REGISTRAR");
+    },
+    get userRegistryImpl(): Address {
+      return requireAddress("SEPOLIA_USER_REGISTRY_IMPL");
+    },
+    get permissionedResolverImpl(): Address {
+      return requireAddress("SEPOLIA_PERMISSIONED_RESOLVER_IMPL");
+    },
+    get universalResolverV2(): Address {
+      return requireAddress("SEPOLIA_UNIVERSAL_RESOLVER_V2");
+    },
+    get verifiableFactory(): Address {
+      return requireAddress("SEPOLIA_VERIFIABLE_FACTORY");
+    },
+    get rentPriceOracle(): Address {
+      return requireAddress("SEPOLIA_RENT_PRICE_ORACLE");
+    },
     /** Circle's real Sepolia USDC — confirmed live to be one of the tokens ENSv2's
      *  ETHRegistrar accepts as `paymentToken` for `getRegisterPrice`/`register`, alongside its
      *  own now-retired project-specific `MockUSDC`. Not a mock: real, permissioned only by
      *  Circle's actual faucet, the same token every other Sepolia project already uses. */
-    usdc: requireAddress("SEPOLIA_USDC"),
-    mandateOrgFactory: optionalAddress("SEPOLIA_MANDATE_ORG_FACTORY"),
+    get usdc(): Address {
+      return requireAddress("SEPOLIA_USDC");
+    },
+    get mandateOrgFactory(): Address | undefined {
+      return optionalAddress("SEPOLIA_MANDATE_ORG_FACTORY");
+    },
     /** Single-org fallback — the registrar one run of the factory flow (or the old
      *  now-deleted DeploySepolia.s.sol) produced. Multi-org callers should read
      *  `mandateOrgFactory`'s own `OrgCreated` events via `listOrgs` instead; this stays for
      *  local dev and `SeedDemo.s.sol` so nothing breaks before that plumbing lands everywhere. */
-    mandateRegistrar: optionalAddress("SEPOLIA_MANDATE_REGISTRAR"),
-  } as const;
+    get mandateRegistrar(): Address | undefined {
+      return optionalAddress("SEPOLIA_MANDATE_REGISTRAR");
+    },
+  };
 }
 
 /** Arc testnet 5042002 — money plane. */
 export function getArcAddresses() {
   return {
-    usdc: requireAddress("ARC_USDC"),
-    erc8004Identity: requireAddress("ARC_ERC8004_IDENTITY"),
-    erc8004Reputation: requireAddress("ARC_ERC8004_REPUTATION"),
-    erc8004Validation: requireAddress("ARC_ERC8004_VALIDATION"),
-    erc8183Jobs: requireAddress("ARC_ERC8183_JOBS"),
-    arcVaultFactory: optionalAddress("ARC_VAULT_FACTORY"),
+    get usdc(): Address {
+      return requireAddress("ARC_USDC");
+    },
+    get erc8004Identity(): Address {
+      return requireAddress("ARC_ERC8004_IDENTITY");
+    },
+    get erc8004Reputation(): Address {
+      return requireAddress("ARC_ERC8004_REPUTATION");
+    },
+    get erc8004Validation(): Address {
+      return requireAddress("ARC_ERC8004_VALIDATION");
+    },
+    get erc8183Jobs(): Address {
+      return requireAddress("ARC_ERC8183_JOBS");
+    },
+    get arcVaultFactory(): Address | undefined {
+      return optionalAddress("ARC_VAULT_FACTORY");
+    },
     /** Single-org fallback — see the matching comment on `getSepoliaAddresses`'s
      *  `mandateRegistrar`. Multi-org callers should read `arcVaultFactory`'s own `VaultCreated`
      *  events via `listVaults` instead. */
-    mandateAnchor: optionalAddress("ARC_MANDATE_ANCHOR"),
-    agentTreasury: optionalAddress("ARC_AGENT_TREASURY"),
-  } as const;
+    get mandateAnchor(): Address | undefined {
+      return optionalAddress("ARC_MANDATE_ANCHOR");
+    },
+    get agentTreasury(): Address | undefined {
+      return optionalAddress("ARC_AGENT_TREASURY");
+    },
+  };
 }
 
 export function getRpcUrls() {

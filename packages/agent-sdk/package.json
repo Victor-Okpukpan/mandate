@@ -1,6 +1,6 @@
 {
   "name": "mandate-agent-sdk",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "private": false,
   "description": "Framework-agnostic SDK for an AI agent to read its own ENS spending mandate and pay against it on Arc — plug into any agent runtime.",
   "license": "MIT",

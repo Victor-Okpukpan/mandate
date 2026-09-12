@@ -33,18 +33,34 @@ export interface ToolContext {
   signer: AgentSigner;
 }
 
+/**
+ * Lazy, same as `getSepoliaAddresses`/`getArcAddresses` themselves — each field only validates
+ * (and only requires its own env var) when a caller actually destructures it. `pay` needs
+ * `treasury` alone; it shouldn't have to set `ARC_ERC8183_JOBS` just because `fund_job` needs
+ * `jobs` too. Found live, building this package's own example app against a minimal `.env`.
+ */
 function requireAddresses() {
   const sepoliaAddrs = getSepoliaAddresses();
   const arcAddrs = getArcAddresses();
-  if (!sepoliaAddrs.mandateRegistrar) throw new Error("SEPOLIA_MANDATE_REGISTRAR not set");
-  if (!arcAddrs.mandateAnchor || !arcAddrs.agentTreasury || !arcAddrs.erc8183Jobs) {
-    throw new Error("ARC_MANDATE_ANCHOR / ARC_AGENT_TREASURY / ARC_ERC8183_JOBS not set");
-  }
   return {
-    registrar: sepoliaAddrs.mandateRegistrar,
-    anchor: arcAddrs.mandateAnchor,
-    treasury: arcAddrs.agentTreasury,
-    jobs: arcAddrs.erc8183Jobs,
+    get registrar(): Address {
+      const v = sepoliaAddrs.mandateRegistrar;
+      if (!v) throw new Error("SEPOLIA_MANDATE_REGISTRAR not set");
+      return v;
+    },
+    get anchor(): Address {
+      const v = arcAddrs.mandateAnchor;
+      if (!v) throw new Error("ARC_MANDATE_ANCHOR not set");
+      return v;
+    },
+    get treasury(): Address {
+      const v = arcAddrs.agentTreasury;
+      if (!v) throw new Error("ARC_AGENT_TREASURY not set");
+      return v;
+    },
+    get jobs(): Address {
+      return arcAddrs.erc8183Jobs; // already a required field — throws its own named error
+    },
   };
 }
 

@@ -128,30 +128,20 @@ function PolicyRuleRow({ rule }: { rule: PrivyPolicyRule }) {
  * what the token actually grants (nothing beyond what the wallet's own on-chain mandate allows).
  */
 /**
- * Public, verified sponsor addresses `mandate-agent-sdk`'s `makeChainClients`/`connectMandate`
- * require regardless of which integration flavor is used below — the same values baked into
- * `.env.example` for every MANDATE deployment on this testnet. Not secrets, safe to hardcode and
- * copy; nothing here is org-specific (those three — registrar, treasury, anchor — come from props,
- * read live for this exact mandate).
+ * `mandate-agent-sdk`'s address getters are lazy — `getSepoliaAddresses()`/`getArcAddresses()`
+ * only validate the one field a caller actually reads, not the whole struct (fixed in 0.2.2; it
+ * used to require the entire ENS-registration address set for a plain `pay()` call, which is why
+ * this list is now this short). Only the two RPC URLs are genuinely shared across every
+ * integration; `ARC_ERC8183_JOBS` is only needed if your agent calls `create_job`/`fund_job`.
+ * Not secrets, safe to hardcode and copy.
  */
 const SHARED_ENV_VARS: Array<[string, string]> = [
   ["SEPOLIA_RPC_URL", "https://ethereum-sepolia-rpc.publicnode.com"],
   ["ARC_RPC_URL", "https://rpc.testnet.arc.network"],
-  ["SEPOLIA_ROOT_REGISTRY", "0x8115186e8f2e0b0281e86ab91f0f48ba90364354"],
-  ["SEPOLIA_ETH_REGISTRY", "0xbdc85dd5b15d7ecb354cd7cb6f2c50b4f2c4f0e2"],
-  ["SEPOLIA_ETH_REGISTRAR", "0xa88553f454b77203b0d036a05c894d555eaaa2cc"],
-  ["SEPOLIA_USER_REGISTRY_IMPL", "0x624a25d67b59d587752ebec8dded8827dae52050"],
-  ["SEPOLIA_PERMISSIONED_RESOLVER_IMPL", "0x9eae5c2730a7dd16bdd1dee6421a1b91e3b0365e"],
-  ["SEPOLIA_UNIVERSAL_RESOLVER_V2", "0x4a1817d13e9cf196f471725176355c1234b63c70"],
-  ["SEPOLIA_VERIFIABLE_FACTORY", "0x10dc6333cdfe1fcef624c6e0a8221b91804cd7ef"],
-  ["SEPOLIA_RENT_PRICE_ORACLE", "0x8914b66260eb8c4fff795650c3ae8cd335958987"],
-  ["SEPOLIA_USDC", "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238"],
-  ["ARC_USDC", "0x3600000000000000000000000000000000000000"],
-  ["ARC_ERC8004_IDENTITY", "0x8004A818BFB912233c491871b3d84c89A494BD9e"],
-  ["ARC_ERC8004_REPUTATION", "0x8004B663056A597Dffe9eCcC1965A193B7388713"],
-  ["ARC_ERC8004_VALIDATION", "0x8004Cb1BF31DAf7788923b405b754f57acEB4272"],
-  ["ARC_ERC8183_JOBS", "0x0747EEf0706327138c69792bF28Cd525089e4583"],
 ];
+
+/** Only needed if your agent calls `create_job`/`fund_job` — every other tool never reads it. */
+const JOBS_ENV_VAR: [string, string] = ["ARC_ERC8183_JOBS", "0x0747EEf0706327138c69792bF28Cd525089e4583"];
 
 type ConnectFlavor = "core" | "anthropic";
 
@@ -288,7 +278,20 @@ await runMandatedAgent(
                 <MonoValue value={value} className="text-secondary" copyable />
               </div>
             ))}
+            {flavor === "anthropic" ? (
+              <div className="flex items-center justify-between gap-3 py-2 text-[12px]">
+                <span className="text-tertiary">{JOBS_ENV_VAR[0]}</span>
+                <MonoValue value={JOBS_ENV_VAR[1]} className="text-secondary" copyable />
+              </div>
+            ) : null}
           </div>
+          {flavor === "anthropic" ? (
+            <p className="mt-2 text-[11.5px] text-disabled">
+              `ARC_ERC8183_JOBS` is only read if Claude decides to call{" "}
+              <code className="font-mono">create_job</code>/<code className="font-mono">fund_job</code> —
+              every other tool, including <code className="font-mono">pay</code>, never touches it.
+            </p>
+          ) : null}
         </div>
       ) : (
         <div className="py-3">
