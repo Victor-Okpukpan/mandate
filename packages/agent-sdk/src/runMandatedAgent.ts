@@ -31,7 +31,6 @@ export async function runMandatedAgent(
     system: config.systemPrompt,
     messages: [{ role: "user", content: userMessage }],
     tools,
-    betas: [],
   });
 
   let turns = 0;

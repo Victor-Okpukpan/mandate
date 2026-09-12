@@ -127,7 +127,19 @@ function PolicyRuleRow({ rule }: { rule: PrivyPolicyRule }) {
  * `web/app/api/agents/connect/route.ts` for the ownership check and `web/lib/agentToken.ts` for
  * what the token actually grants (nothing beyond what the wallet's own on-chain mandate allows).
  */
-function ConnectAgentSection({ registrar, ensName, agentWallet }: { registrar: Address; ensName: string; agentWallet: Address }) {
+function ConnectAgentSection({
+  registrar,
+  ensName,
+  agentWallet,
+  agentTreasury,
+  mandateAnchor,
+}: {
+  registrar: Address;
+  ensName: string;
+  agentWallet: Address;
+  agentTreasury?: Address;
+  mandateAnchor?: Address;
+}) {
   const privy = useOptionalPrivy();
   const [state, setState] = useState<{ status: "idle" } | { status: "loading" } | { status: "error"; message: string } | { status: "done"; token: string }>({
     status: "idle",
@@ -179,6 +191,25 @@ await agent.pay(recipient, "10.00");`
           <pre className="mt-3 overflow-x-auto rounded-lg border border-border-subtle bg-surface-2 px-3 py-2.5 text-[11.5px] leading-relaxed text-secondary">
             {snippet}
           </pre>
+          <p className="mt-4 text-[12px] text-tertiary">
+            `mandate-agent-sdk` also needs these three addresses in your agent's environment
+            (`SEPOLIA_MANDATE_REGISTRAR`, `ARC_AGENT_TREASURY`, `ARC_MANDATE_ANCHOR`) — real
+            values, not secrets, safe to copy:
+          </p>
+          <div className="mt-2 divide-y divide-border-subtle rounded-lg border border-border-subtle bg-surface-2 px-3">
+            <div className="flex items-center justify-between gap-3 py-2 text-[12px]">
+              <span className="text-tertiary">SEPOLIA_MANDATE_REGISTRAR</span>
+              <MonoValue value={registrar} className="text-secondary" copyable />
+            </div>
+            <div className="flex items-center justify-between gap-3 py-2 text-[12px]">
+              <span className="text-tertiary">ARC_AGENT_TREASURY</span>
+              <MonoValue value={agentTreasury} className="text-secondary" copyable />
+            </div>
+            <div className="flex items-center justify-between gap-3 py-2 text-[12px]">
+              <span className="text-tertiary">ARC_MANDATE_ANCHOR</span>
+              <MonoValue value={mandateAnchor} className="text-secondary" copyable />
+            </div>
+          </div>
         </div>
       ) : (
         <div className="py-3">
@@ -400,7 +431,13 @@ export function MandateDetailPanel({ node, state, addresses, displayName, regist
       </Section>
 
       {isOrgAdmin && registrar && agentWallet && state !== "revoked" && displayName ? (
-        <ConnectAgentSection registrar={registrar} ensName={displayName} agentWallet={agentWallet} />
+        <ConnectAgentSection
+          registrar={registrar}
+          ensName={displayName}
+          agentWallet={agentWallet}
+          agentTreasury={addresses.agentTreasury}
+          mandateAnchor={addresses.mandateAnchor}
+        />
       ) : null}
 
       <Section title="Off-chain protection" subtitle="Privy checks the recipient and payment size before the agent's wallet ever signs.">
