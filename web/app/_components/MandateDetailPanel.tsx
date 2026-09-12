@@ -127,6 +127,34 @@ function PolicyRuleRow({ rule }: { rule: PrivyPolicyRule }) {
  * `web/app/api/agents/connect/route.ts` for the ownership check and `web/lib/agentToken.ts` for
  * what the token actually grants (nothing beyond what the wallet's own on-chain mandate allows).
  */
+/**
+ * Public, verified sponsor addresses `mandate-agent-sdk`'s `makeChainClients`/`connectMandate`
+ * require regardless of which integration flavor is used below — the same values baked into
+ * `.env.example` for every MANDATE deployment on this testnet. Not secrets, safe to hardcode and
+ * copy; nothing here is org-specific (those three — registrar, treasury, anchor — come from props,
+ * read live for this exact mandate).
+ */
+const SHARED_ENV_VARS: Array<[string, string]> = [
+  ["SEPOLIA_RPC_URL", "https://ethereum-sepolia-rpc.publicnode.com"],
+  ["ARC_RPC_URL", "https://rpc.testnet.arc.network"],
+  ["SEPOLIA_ROOT_REGISTRY", "0x8115186e8f2e0b0281e86ab91f0f48ba90364354"],
+  ["SEPOLIA_ETH_REGISTRY", "0xbdc85dd5b15d7ecb354cd7cb6f2c50b4f2c4f0e2"],
+  ["SEPOLIA_ETH_REGISTRAR", "0xa88553f454b77203b0d036a05c894d555eaaa2cc"],
+  ["SEPOLIA_USER_REGISTRY_IMPL", "0x624a25d67b59d587752ebec8dded8827dae52050"],
+  ["SEPOLIA_PERMISSIONED_RESOLVER_IMPL", "0x9eae5c2730a7dd16bdd1dee6421a1b91e3b0365e"],
+  ["SEPOLIA_UNIVERSAL_RESOLVER_V2", "0x4a1817d13e9cf196f471725176355c1234b63c70"],
+  ["SEPOLIA_VERIFIABLE_FACTORY", "0x10dc6333cdfe1fcef624c6e0a8221b91804cd7ef"],
+  ["SEPOLIA_RENT_PRICE_ORACLE", "0x8914b66260eb8c4fff795650c3ae8cd335958987"],
+  ["SEPOLIA_USDC", "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238"],
+  ["ARC_USDC", "0x3600000000000000000000000000000000000000"],
+  ["ARC_ERC8004_IDENTITY", "0x8004A818BFB912233c491871b3d84c89A494BD9e"],
+  ["ARC_ERC8004_REPUTATION", "0x8004B663056A597Dffe9eCcC1965A193B7388713"],
+  ["ARC_ERC8004_VALIDATION", "0x8004Cb1BF31DAf7788923b405b754f57acEB4272"],
+  ["ARC_ERC8183_JOBS", "0x0747EEf0706327138c69792bF28Cd525089e4583"],
+];
+
+type ConnectFlavor = "core" | "anthropic";
+
 function ConnectAgentSection({
   registrar,
   ensName,
@@ -144,6 +172,7 @@ function ConnectAgentSection({
   const [state, setState] = useState<{ status: "idle" } | { status: "loading" } | { status: "error"; message: string } | { status: "done"; token: string }>({
     status: "idle",
   });
+  const [flavor, setFlavor] = useState<ConnectFlavor>("core");
 
   async function handleConnect() {
     setState({ status: "loading" });
@@ -164,18 +193,41 @@ function ConnectAgentSection({
     }
   }
 
-  const snippet = state.status === "done"
-    ? `import { connectMandate, makeApiSigner } from "mandate-agent-sdk";
+  const baseUrl = typeof window !== "undefined" ? window.location.origin : "https://app.runmandate.xyz";
+  const token = state.status === "done" ? state.token : "";
+
+  const coreSnippet = `import { connectMandate, makeApiSigner } from "mandate-agent-sdk";
 
 const signer = makeApiSigner({
-  token: "${state.status === "done" ? state.token : ""}",
+  token: "${token}",
   address: "${agentWallet}",
-  baseUrl: "${typeof window !== "undefined" ? window.location.origin : "https://app.runmandate.xyz"}",
+  baseUrl: "${baseUrl}",
 });
 
 const agent = await connectMandate({ ensName: "${ensName}", signer });
-await agent.pay(recipient, "10.00");`
-    : "";
+await agent.pay(recipient, "10.00");`;
+
+  const anthropicSnippet = `import Anthropic from "@anthropic-ai/sdk";
+import { makeApiSigner, makeChainClients } from "mandate-agent-sdk";
+import { runMandatedAgent } from "mandate-agent-sdk/anthropic";
+
+const signer = makeApiSigner({
+  token: "${token}",
+  address: "${agentWallet}",
+  baseUrl: "${baseUrl}",
+});
+
+// Also needs ANTHROPIC_API_KEY in your environment.
+const client = new Anthropic();
+
+await runMandatedAgent(
+  client,
+  { ensName: "${ensName}", clients: makeChainClients(), signer, systemPrompt: "You are an autonomous agent with a real, on-chain spending mandate." },
+  "pay 10 USDC to <recipient>",
+);
+// Claude calls read_my_mandate() and pay() itself — try an instruction that violates your
+// mandate (over the cap, or an address not on the allowlist) and it'll report the real,
+// on-chain reason the payment was refused, not just a bare transaction hash.`;
 
   return (
     <Section title="Connect your agent" subtitle="A scoped credential for this wallet only — never this platform's own Privy keys.">
@@ -183,18 +235,39 @@ await agent.pay(recipient, "10.00");`
         <div className="py-3">
           <p className="text-[13px] text-secondary">
             Token issued. It only ever authorizes <MonoValue value={agentWallet} className="text-secondary" copyable /> —
-            paste it into your agent's environment and drop the snippet below into your own runtime.
+            paste it into your agent's environment.
           </p>
           <div className="mt-2 flex items-center justify-between gap-2 rounded-lg border border-border-subtle bg-surface-2 px-3 py-2">
             <MonoValue value={state.token} truncate={16} copyable />
           </div>
-          <pre className="mt-3 overflow-x-auto rounded-lg border border-border-subtle bg-surface-2 px-3 py-2.5 text-[11.5px] leading-relaxed text-secondary">
-            {snippet}
+
+          <div className="mt-4 inline-flex rounded-lg border border-border-subtle p-0.5">
+            {(
+              [
+                ["core", "Direct (core API)"],
+                ["anthropic", "With Claude (Tool Runner)"],
+              ] as const
+            ).map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setFlavor(id)}
+                className={`rounded-md px-3 py-1.5 text-[12.5px] font-medium transition-colors ${
+                  flavor === id ? "bg-surface-2 text-primary" : "text-tertiary hover:text-secondary"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <pre className="mt-2 overflow-x-auto rounded-lg border border-border-subtle bg-surface-2 px-3 py-2.5 text-[11.5px] leading-relaxed text-secondary">
+            {flavor === "core" ? coreSnippet : anthropicSnippet}
           </pre>
+
           <p className="mt-4 text-[12px] text-tertiary">
-            `mandate-agent-sdk` also needs these three addresses in your agent's environment
-            (`SEPOLIA_MANDATE_REGISTRAR`, `ARC_AGENT_TREASURY`, `ARC_MANDATE_ANCHOR`) — real
-            values, not secrets, safe to copy:
+            Either flavor needs the same environment underneath — real values, not secrets, safe to
+            copy into a `.env` file.
+            {flavor === "anthropic" ? " Add ANTHROPIC_API_KEY yourself; it's the one value here that IS a secret." : ""}
           </p>
           <div className="mt-2 divide-y divide-border-subtle rounded-lg border border-border-subtle bg-surface-2 px-3">
             <div className="flex items-center justify-between gap-3 py-2 text-[12px]">
@@ -209,6 +282,12 @@ await agent.pay(recipient, "10.00");`
               <span className="text-tertiary">ARC_MANDATE_ANCHOR</span>
               <MonoValue value={mandateAnchor} className="text-secondary" copyable />
             </div>
+            {SHARED_ENV_VARS.map(([key, value]) => (
+              <div key={key} className="flex items-center justify-between gap-3 py-2 text-[12px]">
+                <span className="text-tertiary">{key}</span>
+                <MonoValue value={value} className="text-secondary" copyable />
+              </div>
+            ))}
           </div>
         </div>
       ) : (
