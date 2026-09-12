@@ -39,7 +39,7 @@ export function ArchitectureDiagram() {
           <Box
             title="Enforcer"
             accent="text-accent"
-            items={["watches Sepolia events", "writes Privy policy", "signs EIP-712 SyncPayload"]}
+            items={["watches Sepolia events", "signs EIP-712 SyncPayload", "Privy policy — paused"]}
           />
           <div className="flex flex-col items-center gap-1 font-mono text-[10px] text-tertiary">
             <span>↓ narrows only, never widens ↓</span>

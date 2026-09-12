@@ -13,10 +13,11 @@ export default function RoadmapDocsPage() {
       <DocsJsonLd title={TITLE} description={DESCRIPTION} path="/docs/roadmap" />
       <h1>Roadmap</h1>
       <p>
-        The current version does one thing well: a company issues an agent a spending mandate,
-        two independent layers enforce it, and revoking the ENS name kills the agent. The
-        pieces below are built or half-built in the codebase but deliberately kept out of the
-        product surface for now.
+        The current version does one thing well: a company issues an agent a spending mandate, an
+        on-chain Arc contract enforces it on every payment, and revoking the ENS name kills the
+        agent. A second, off-chain Privy enforcement layer is designed and built but currently sits
+        disabled (see <a href="/docs/security">/docs/security</a>). The pieces below are built or
+        half-built in the codebase but deliberately kept out of the product surface for now.
       </p>
 
       <h2>Agent-to-agent commerce (ERC-8183 jobs)</h2>

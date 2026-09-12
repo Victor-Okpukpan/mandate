@@ -3,7 +3,7 @@ import { buildMetadata } from "../../lib/seo";
 
 const TITLE = "How MANDATE works — spending mandates for AI agents";
 const DESCRIPTION =
-  "How an ENS subname becomes an AI agent's spending mandate, enforced off-chain by Privy and on-chain by Arc — the three-plane model, in one page.";
+  "How an ENS subname becomes an AI agent's spending mandate, enforced on-chain by Arc contracts checked on every payment — the three-plane model, in one page.";
 
 export const metadata = buildMetadata({ title: TITLE, description: DESCRIPTION, path: "/docs" });
 
@@ -20,9 +20,11 @@ export default function DocsOverviewPage() {
         it.
       </p>
       <p>
-        That mandate is compiled into a Privy policy off-chain and anchored on Arc on-chain, so an
-        agent&rsquo;s spending is checked twice, from one source of truth. Revoke the ENS role and
-        the agent&rsquo;s next payment dies mid-flight.
+        That mandate is anchored on Arc on-chain, from one source of truth, and checked on every
+        payment the agent tries to make. Revoke the ENS role and the agent&rsquo;s next payment
+        dies mid-flight. A second, off-chain layer — a Privy wallet policy compiled from the same
+        mandate — is part of the design but currently sits disabled; see{" "}
+        <a href="/docs/security">the security page</a> for exactly why and when that changes.
       </p>
 
       <h2>Creating your own organisation</h2>
@@ -93,21 +95,23 @@ export default function DocsOverviewPage() {
         <li>
           <strong>Watch it land.</strong> The dashboard returns you to the tree the instant the
           transaction confirms — the new agent is already there. Click it to open its detail view:
-          plain-language terms, the ENS records behind them, its Arc-side state, and (once an
-          Enforcer has synced it) the actual Privy policy guarding its wallet.
+          plain-language terms, the ENS records behind them, and (once an Enforcer has synced it)
+          the Arc anchor actually guarding its wallet.
         </li>
         <li>
           <strong>Revoke it.</strong> The detail view has a &ldquo;Revoke this mandate&rdquo;
           button. One transaction, and the agent&rsquo;s wallet can no longer sign a qualifying
-          payment, on either enforcement layer.
+          payment — checked on-chain, on every attempt.
         </li>
       </ol>
       <p>
-        One honest gap: syncing a freshly-issued mandate onto Arc and attaching its Privy policy
-        is done by a separate background service, the Enforcer — not something a visitor clicks a
-        button for in this UI. That service has to be running for the drawer to show live Arc/Privy
-        state; until then, a mandate exists and is fully real on Sepolia, but its money-plane
-        enforcement hasn&rsquo;t been mirrored yet.
+        One honest gap: syncing a freshly-issued mandate onto Arc is done by a separate background
+        service, the Enforcer — not something a visitor clicks a button for in this UI. That
+        service has to be running for the drawer to show live Arc state; until then, a mandate
+        exists and is fully real on Sepolia, but its money-plane enforcement hasn&rsquo;t been
+        mirrored yet. (The Enforcer also compiles a matching Privy wallet policy — a second,
+        off-chain check — but that half currently sits disabled; see{" "}
+        <a href="/docs/security">/docs/security</a> for why.)
       </p>
 
       <h2>Connecting your own agent</h2>
@@ -184,9 +188,10 @@ export default function DocsOverviewPage() {
       <h2>How the three planes fit</h2>
       <p>
         Authority lives on Sepolia (ENSv2). Enforcement is an off-chain service that watches
-        Sepolia and propagates — never originates — permission into a Privy policy and a signed
-        Arc anchor. Money moves on Arc, checked against that anchor on every spend. Full diagram
-        at <a href="/docs/architecture">/docs/architecture</a>.
+        Sepolia and propagates — never originates — permission into a signed Arc anchor (and, once
+        Privy authorizes Arc for this app, a matching Privy wallet policy too). Money moves on Arc,
+        checked against that anchor on every spend. Full diagram at{" "}
+        <a href="/docs/architecture">/docs/architecture</a>.
       </p>
     </Prose>
   );

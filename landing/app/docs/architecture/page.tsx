@@ -45,11 +45,15 @@ export default function ArchitecturePage() {
 
       <h2>Enforcement plane — off-chain</h2>
       <p>
-        The Enforcer watches Sepolia and propagates state into two independent enforcement points:
-        a Privy conditional policy (so a wallet physically cannot sign outside its mandate) and the
-        Arc anchor (so the treasury physically cannot pay outside it). It is a propagator, not an
-        authority — every write it makes is EIP-712 signed and independently reproducible from the
-        Sepolia state it's mirroring.
+        The Enforcer watches Sepolia and propagates state onto Arc: a signed anchor that the
+        treasury contract checks on every payment, so it physically cannot pay outside the mandate.
+        By design it also propagates a matching Privy conditional policy onto the agent's wallet —
+        a second, independent enforcement point — but that half currently sits disabled (Arc isn't
+        yet on Privy's per-app relay allowlist, and any policy on a wallet blocks it from signing on
+        Arc at all; see <a href="/docs/security">/docs/security</a>). The Arc anchor is the sole
+        active enforcement layer until that's flipped back on. Either way, the Enforcer is a
+        propagator, not an authority — every write it makes is EIP-712 signed and independently
+        reproducible from the Sepolia state it's mirroring.
       </p>
 
       <h2>Money plane — Arc</h2>

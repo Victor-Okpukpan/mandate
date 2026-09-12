@@ -1,4 +1,4 @@
-import { Prose, DocsTable, DocsJsonLd } from "../_components/Prose";
+import { Prose, DocsTable, DocsJsonLd, Callout } from "../_components/Prose";
 import { buildMetadata } from "../../../lib/seo";
 
 const TITLE = "Privy wallet policies for AI agents, and their limits";
@@ -12,9 +12,19 @@ export default function PrivyDocsPage() {
     <Prose>
       <DocsJsonLd title={TITLE} description={DESCRIPTION} path="/docs/privy" />
       <h1>Privy — a spend management tool for organizations</h1>
+      <Callout tone="warn">
+        Everything below describes the design's intended enforcement split. Right now, only the Arc
+        half is live: Arc testnet isn&rsquo;t yet on Privy&rsquo;s per-app relay allowlist, and any
+        policy attached to a wallet blocks it from signing on Arc at all — so agent wallets
+        currently carry no Privy policy, and <code>MandateAnchor</code>/<code>AgentTreasury</code>{" "}
+        on Arc are the sole active enforcement. See{" "}
+        <a href="/docs/security">/docs/security</a> for the full explanation and what flips this
+        back on.
+      </Callout>
       <p>
-        Remove Privy and agents cannot sign at all. It is one of two independent enforcement gates
-        a payment must clear, not a convenience wrapped around a seed phrase.
+        Privy still does real work today — it&rsquo;s the custodian: agent wallets are Privy server
+        wallets, no seed phrase ever held by anyone. The conditional-policy layer described below is
+        what currently sits disabled, not Privy&rsquo;s custody of the key itself.
       </p>
 
       <h2>Organization wallets, mapped onto directly</h2>
@@ -31,7 +41,7 @@ export default function PrivyDocsPage() {
         ]}
       />
 
-      <h2>The enforcement split — verified, not assumed</h2>
+      <h2>The enforcement split — designed, not currently both live</h2>
       <p>
         Privy&rsquo;s stateful policies do support cumulative rolling spend caps, via aggregations.
         The constraints are real: a maximum of ten aggregations per app, no per-wallet{" "}
@@ -40,24 +50,26 @@ export default function PrivyDocsPage() {
         concurrent requests can all pass before any of them records.
       </p>
       <DocsTable
-        head={["Enforcement", "Where it lives", "Why"]}
+        head={["Enforcement", "Where it's meant to live", "Why"]}
         rows={[
           [
             "Per-tx cap, recipient allowlist, chain restriction",
-            "Privy",
+            "Privy (currently disabled — see the callout above)",
             "Stateless rules, unlimited in number, evaluated before signature.",
           ],
           [
             "Cumulative rolling budget",
-            "AgentTreasury on Arc",
+            "AgentTreasury on Arc — the active layer today",
             "Privy caps at ~10 agents with rolling budgets, can't scope per wallet, can't exceed 72h, and races under concurrency.",
           ],
         ]}
       />
       <p>
-        These are not symmetric gates or defense in depth — that phrasing implies redundancy that
-        isn&rsquo;t there. They are a fast stateless pre-filter and an authoritative stateful
-        ledger, with two different jobs.
+        By design these are not symmetric gates or defense in depth — that phrasing implies
+        redundancy that isn&rsquo;t there. They&rsquo;re meant to be a fast stateless pre-filter and
+        an authoritative stateful ledger, with two different jobs. Today, with the pre-filter
+        disabled, the ledger is doing both jobs alone — still fully real, still fails closed, just
+        without the earlier stateless check in front of it.
       </p>
 
       <h2>Intents govern the humans, policies govern the agents</h2>

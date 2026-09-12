@@ -30,7 +30,7 @@ const FAQ: Array<{ question: string; answer: string }> = [
   {
     question: "Do you provide the AI agent?",
     answer:
-      "No. MANDATE issues and enforces authority — the ENS record, the provisioned wallet, the synced policy. The agent doing the work is whatever you already run: an LLM loop, a cron job, your own stack. Bring your own agent; this is the seatbelt.",
+      "No. MANDATE issues and enforces authority — the ENS record, the provisioned wallet, the anchor an Arc contract checks on every spend. The agent doing the work is whatever you already run: an LLM loop, a cron job, your own stack. Bring your own agent; this is the seatbelt.",
   },
   {
     question: "How does my agent actually connect to its mandate?",
@@ -40,7 +40,7 @@ const FAQ: Array<{ question: string; answer: string }> = [
   {
     question: "How do you revoke an AI agent's spending power?",
     answer:
-      "One transaction on Sepolia. The Enforcer tears down the agent's Privy policy and flips its Arc anchor — its very next payment is refused, before it signs, and again on-chain if it somehow tried.",
+      "One transaction on Sepolia. The Enforcer flips its Arc anchor — its very next payment reverts on-chain before it completes.",
   },
   {
     question: "Can an agent change its own limits?",
@@ -60,7 +60,7 @@ const FAQ: Array<{ question: string; answer: string }> = [
   {
     question: "Does the agent ever hold private keys?",
     answer:
-      "No. Its wallet is a Privy-managed signer gated by a conditional policy — the agent never sees a seed phrase, and the pooled treasury on Arc, not the agent's own wallet, holds the funds it draws against.",
+      "No. Its wallet is a Privy-managed signer — the agent never sees a seed phrase. Its spending is bounded by an Arc contract checked on every payment, and the pooled treasury on Arc, not the agent's own wallet, holds the funds it draws against.",
   },
 ];
 
@@ -210,7 +210,7 @@ export default function LandingPage() {
                   title: "Enforcement",
                   accentClass: "bg-accent",
                   description:
-                    "The Enforcer watches Sepolia and compiles each mandate into a Privy policy and a signed Arc anchor. A propagator, not an authority — it can only ever narrow, never widen.",
+                    "The Enforcer watches Sepolia and compiles each mandate into a signed Arc anchor. A propagator, not an authority — it can only ever narrow, never widen.",
                 },
                 {
                   chain: "Arc",
@@ -243,7 +243,7 @@ export default function LandingPage() {
                 {
                   title: "Run",
                   description:
-                    "MANDATE doesn't supply the agent — a small SDK lets whatever you already run (an LLM loop, a cron job, your own stack) pick up that wallet and get to work. Two independent systems check every payment it tries to make.",
+                    "MANDATE doesn't supply the agent — a small SDK lets whatever you already run (an LLM loop, a cron job, your own stack) pick up that wallet and get to work. Every payment it tries to make is checked against the Arc anchor.",
                 },
                 {
                   title: "Attenuate",
@@ -253,7 +253,7 @@ export default function LandingPage() {
                 {
                   title: "Revoke",
                   description:
-                    "One transaction on Sepolia. The Enforcer tears down the Privy policy and flips the Arc anchor — the agent's next payment is refused mid-flight, on-chain.",
+                    "One transaction on Sepolia. The Enforcer flips the Arc anchor — the agent's next payment is refused mid-flight, on-chain.",
                 },
               ]}
             />
@@ -365,7 +365,7 @@ export default function LandingPage() {
                 {
                   href: "/docs/privy",
                   title: "Privy",
-                  body: "Organization wallets, conditional policies, and intents. Remove Privy and agents cannot sign at all — it's one of two enforcement gates, not a convenience.",
+                  body: "Organization wallets and intents. Remove Privy and agents cannot sign at all — no seed phrase ever held by anyone. Its conditional-policy layer is designed but currently paused; see the docs.",
                   cta: "Read the Privy docs →",
                 },
               ].map((track) => (
