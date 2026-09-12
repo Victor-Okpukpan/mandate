@@ -365,7 +365,7 @@ export default function LandingPage() {
                 {
                   href: "/docs/privy",
                   title: "Privy",
-                  body: "Organization wallets and intents. Remove Privy and agents cannot sign at all — no seed phrase ever held by anyone. Its conditional-policy layer is designed but currently paused; see the docs.",
+                  body: "Organization wallets and human-approval intents. Remove Privy and agents cannot sign at all — no seed phrase ever held by anyone.",
                   cta: "Read the Privy docs →",
                 },
               ].map((track) => (

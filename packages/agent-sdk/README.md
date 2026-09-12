@@ -55,9 +55,10 @@ loop already lives — a LangChain tool, a raw OpenAI function-calling loop, a c
 - `makePrivySigner(privy, walletId, address, arcClient)` — direct Privy signing. Requires the
   platform's own `PRIVY_APP_ID`/`PRIVY_APP_SECRET`, which controls every wallet on the whole
   platform — appropriate for this repo's own services (the Enforcer, the demo agents), **not** for
-  an external org's agent process. `arcClient` is required for Arc sends: Arc isn't yet on Privy's
-  per-app relay allowlist, so this signs the transaction with Privy and broadcasts the raw bytes
-  itself (see the security docs) — pass a `PublicClient` for Arc, e.g. `makeChainClients().arc`.
+  an external org's agent process. `arcClient` is required for Arc sends: this app is not
+  authorized to relay `eth_sendTransaction` calls on Arc directly, so this signs the transaction
+  with Privy and broadcasts the raw bytes itself (see the security docs) — pass a `PublicClient`
+  for Arc, e.g. `makeChainClients().arc`.
 - `makeDevSigner(privateKey, rpcUrls)` — Anvil/local testing only. Never point this at Sepolia or
   Arc testnet with a real key.
 

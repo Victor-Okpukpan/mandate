@@ -15,9 +15,8 @@ export default function RoadmapDocsPage() {
       <p>
         The current version does one thing well: a company issues an agent a spending mandate, an
         on-chain Arc contract enforces it on every payment, and revoking the ENS name kills the
-        agent. A second, off-chain Privy enforcement layer is designed and built but currently sits
-        disabled (see <a href="/docs/security">/docs/security</a>). The pieces below are built or
-        half-built in the codebase but deliberately kept out of the product surface for now.
+        agent. The pieces below are built or half-built in the codebase but deliberately kept out
+        of the product surface for now.
       </p>
 
       <h2>Agent-to-agent commerce (ERC-8183 jobs)</h2>
@@ -39,7 +38,7 @@ export default function RoadmapDocsPage() {
       <h2>Wallet-ownership quorums</h2>
       <p>
         By default an agent&rsquo;s Privy wallet is ownerless — anyone holding the app secret could
-        alter its policy. A signing quorum closes that so only the Enforcer can. It works today via
+        mutate it. A signing quorum closes that so only the Enforcer can. It works today via
         setup scripts; the next version makes it a step in onboarding rather than an advanced path.
       </p>
     </Prose>

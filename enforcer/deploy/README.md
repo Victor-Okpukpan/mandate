@@ -1,7 +1,7 @@
 # Running the Enforcer on a VPS
 
 The Enforcer is a long-lived process — it watches Sepolia mandate events and propagates each one
-into a Privy policy and a signed Arc anchor. Nothing about it is serverless; it must stay running,
+into a signed Arc anchor. Nothing about it is serverless; it must stay running,
 or every mandate issued while it's down sits real on Sepolia with no enforcement mirrored to it
 (see `landing/app/docs/page.tsx`'s own "Using the app" section, which discloses this gap directly).
 

@@ -18,8 +18,7 @@ flowchart TB
 
   subgraph OFF["Off-chain — enforcement plane"]
     ENF[Enforcer service]
-    PRIVY[(Privy Organization:<br/>key quorums + conditional policies)]
-    ENF -->|writes policy rules| PRIVY
+    PRIVY[(Privy Organization:<br/>server wallet custody)]
   end
 
   subgraph ARC["Arc testnet 5042002 — money plane"]
@@ -69,11 +68,10 @@ on-chain is expensive, so inheritance makes widening structurally impossible ins
 checked.
 
 **Enforcement (off-chain).** The Enforcer watches Sepolia and propagates — never originates —
-state into two independent enforcement points: a Privy conditional policy, and a signed
-`MandateAnchor.syncMandate` call on Arc. It is a propagator, not an authority: every write is
-EIP-712 signed and independently reproducible from the Sepolia state it mirrors. Revocation reuses
-the same `syncMandate` path with `revoked: true`, rather than a separate signing scheme — one
-code path, the same nonce-monotonicity guarantee.
+state into a signed `MandateAnchor.syncMandate` call on Arc. It is a propagator, not an authority:
+every write is EIP-712 signed and independently reproducible from the Sepolia state it mirrors.
+Revocation reuses the same `syncMandate` path with `revoked: true`, rather than a separate signing
+scheme — one code path, the same nonce-monotonicity guarantee.
 
 **Money (Arc).** `MandateAnchor.assertSpend` is the gate every payment passes through, checked in
 order: revoked → expired → over the per-tx cap → recipient not allowlisted → **stale**. The last

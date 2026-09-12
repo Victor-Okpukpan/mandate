@@ -6,12 +6,12 @@ who holds the keys.**
 An organization issues each of its AI agents an ENSv2 subname — non-transferable, self-expiring,
 instantly revocable. The subname's resolver records **are** the agent's authority: budget, per-tx
 cap, expiry, allowed recipients. The agent can read its own limits but is cryptographically
-incapable of raising them. Two independent systems read that authority and enforce it —
-a Privy wallet policy, off-chain, and `AgentTreasury`/`MandateAnchor` on Arc, on-chain. Revoke the
-ENS subname and both die at once.
+incapable of raising them. `AgentTreasury`/`MandateAnchor` on Arc read that authority and enforce
+it on-chain, checked on every payment. Revoke the ENS subname and the agent's next payment dies
+mid-flight.
 
 **MANDATE does not run your agent.** It issues and enforces the authority layer only — the ENS
-record, the provisioned wallet, the synced policy. The agent itself is whatever you already run:
+record, the provisioned wallet, the on-chain anchor. The agent itself is whatever you already run:
 an LLM loop, a cron job, this repo's own example runtimes under `agents/`. Bring your own agent;
 this is the seatbelt.
 
@@ -34,8 +34,7 @@ Flow).
    allowed recipients. The app provisions a real Privy server wallet for it (no human holds the
    key) and writes the terms as ENS text records via `MandateRegistrar.issueMandate`.
 3. **The Enforcer picks it up** (`enforcer/`) — a long-lived process watching both factories, so a
-   brand-new org needs no restart. For every mandate it finds, it (a) compiles a Privy policy from
-   the mandate's terms and attaches it to the agent's wallet, and (b) signs and posts a matching
+   brand-new org needs no restart. For every mandate it finds, it signs and posts a matching
    record onto the Arc-side `MandateAnchor`.
 4. **The agent spends** — whatever runtime is holding that wallet calls `AgentTreasury.payTo`.
    Nothing pre-checks the call; the contract just enforces its own rules (cap, allowlist, revoked
@@ -43,8 +42,8 @@ Flow).
    no-LLM stand-in that does exactly this, so the enforcement can be shown live without an API key
    or a reasoning loop in the way.
 5. **Revoke** — one click on the dashboard calls `MandateRegistrar.revokeMandate`. The Enforcer
-   mirrors it onto the anchor and collapses the Privy policy to a bare `DENY *`. The agent's very
-   next payment — even one that was valid a second earlier — dies on both layers.
+   mirrors it onto the anchor. The agent's very next payment — even one that was valid a second
+   earlier — reverts on-chain.
 
 ## Connecting your own agent
 
@@ -93,26 +92,21 @@ both built on this package (via the workspace, not the published copy); see
   sub-agent; the registrar rejects anything that isn't strictly narrower in every dimension.
 - Registration is paid for in a real ERC-20, not minted test tokens — see the Arc/USDC note below.
 
-### Privy — wallet custody and the off-chain policy pre-filter
+### Privy — wallet custody
 - **Server wallets**: every agent gets a real Privy embedded wallet (`wallets().create()`),
   provisioned by the app the moment an agent is registered — no human ever holds or sees the key.
-- **Policies**: the Enforcer compiles each mandate's terms into a Privy conditional policy —
-  one ALLOW rule (treasury address, `payTo.amount ≤ perTxCap`, `payTo.to ∈ allowlist`, all ANDed)
-  over a `DENY *` default — and attaches it to the agent's wallet. Privy pre-filters the per-tx cap
-  and the recipient allowlist before a transaction is even signed; the *cumulative* rolling budget
-  is deliberately left to the on-chain layer instead (Privy's stateful aggregations can't partition
-  per-wallet at the scale this needs).
 - **Key quorums** (optional, `enforcer/scripts/setup-authorization-quorum.ts`): gives a wallet an
   `owner_id` so only a signed quorum — not just anyone holding the app secret — can alter it. Used
   by the org-admin approvals flow (`/org/[org]/approvals`), off by default.
-- **The one real gap found and worked around**: Privy's Wallet API relay (`eth_sendTransaction`)
-  authorizes chains per-app, and Arc testnet isn't on that list yet for this app — confirmed live
+- **Arc transactions are sign-then-broadcast, not one-call `sendTransaction`**: Privy's Wallet API
+  relay authorizes chains per-app, and Arc testnet isn't on that list for this app — confirmed live
   (`401 App is not authorized to transact on chain eip155:5042002`), not a config mistake.
   `eth_signTransaction` sits on the other side of that gate (it never touches the network, so there
   is nothing for Privy to authorize) — `agents/shared/src/signer.ts` builds the Arc transaction
   itself, has Privy sign it, and broadcasts the raw bytes via Arc's own RPC. The private key never
-  leaves Privy's custody; only the broadcast step moves. Drop this branch once Arc is added to
-  Privy's relay allowlist.
+  leaves Privy's custody; only the broadcast step moves.
+- Spending caps, the allowlist, and revocation are enforced on-chain by `AgentTreasury`/
+  `MandateAnchor` — that's the sole enforcement layer this deployment runs today.
 
 ### Arc — the money plane
 - `MandateAnchor.sol` mirrors a mandate's terms on-chain (synced by the Enforcer) and tracks
@@ -143,7 +137,7 @@ Three planes, one source of truth. Full writeup and diagram at
 | Plane | Chain | What lives there |
 |---|---|---|
 | Authority | Sepolia (ENSv2) | `MandateOrgFactory`, `MandateRegistrar` — every org and mandate as an ENS name |
-| Enforcement | Off-chain | The Enforcer — watches both factories, propagates into Privy + Arc |
+| Enforcement | Off-chain | The Enforcer — watches both factories, propagates into a signed Arc anchor |
 | Money | Arc testnet | `ArcVaultFactory`, `MandateAnchor`, `AgentTreasury` — checked spend, credit facility |
 
 ## Repo layout
@@ -155,7 +149,7 @@ packages/ui/            Design tokens, type scale, shared React primitives
 packages/agent-sdk/      mandate-agent-sdk — framework-agnostic "bring your own agent" integration surface
 landing/                 Next.js — the pitch + per-sponsor docs + roadmap (runmandate.xyz)
 web/                      Next.js — self-serve org onboarding + the mandate dashboard (app.runmandate.xyz)
-enforcer/                 Off-chain service syncing ENS mandates to Privy + Arc — see enforcer/deploy/README.md to run it persistently
+enforcer/                 Off-chain service syncing ENS mandates onto Arc — see enforcer/deploy/README.md to run it persistently
 agents/                    Mandated agent runtimes, the no-LLM demo-spend script, and the adversarial red-team agent
 ```
 
@@ -233,8 +227,7 @@ the relevant contract's own NatSpec and at `/docs/architecture`:
    a real Enforcer crash, not anticipated. Both the app and the Enforcer read vaults this way now.
 6. **Arc payments sign-then-broadcast instead of one-call `sendTransaction`.** See the Privy section
    above — a real, live-confirmed gap in Privy's per-app chain relay authorization, not a design
-   choice; the workaround is isolated to `agents/shared/src/signer.ts` and reverts to the simpler
-   path the moment Arc is added to that allowlist.
+   choice; the workaround is isolated to `agents/shared/src/signer.ts`.
 
 Full known-limitations list, honestly stated rather than left for a judge to find, at
 `/docs/security`. Deferred scope (agent-to-agent jobs, sub-delegation UI, quorum onboarding as a

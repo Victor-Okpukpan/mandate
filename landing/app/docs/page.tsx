@@ -22,9 +22,7 @@ export default function DocsOverviewPage() {
       <p>
         That mandate is anchored on Arc on-chain, from one source of truth, and checked on every
         payment the agent tries to make. Revoke the ENS role and the agent&rsquo;s next payment
-        dies mid-flight. A second, off-chain layer — a Privy wallet policy compiled from the same
-        mandate — is part of the design but currently sits disabled; see{" "}
-        <a href="/docs/security">the security page</a> for exactly why and when that changes.
+        dies mid-flight.
       </p>
 
       <h2>Creating your own organisation</h2>
@@ -109,9 +107,7 @@ export default function DocsOverviewPage() {
         service, the Enforcer — not something a visitor clicks a button for in this UI. That
         service has to be running for the drawer to show live Arc state; until then, a mandate
         exists and is fully real on Sepolia, but its money-plane enforcement hasn&rsquo;t been
-        mirrored yet. (The Enforcer also compiles a matching Privy wallet policy — a second,
-        off-chain check — but that half currently sits disabled; see{" "}
-        <a href="/docs/security">/docs/security</a> for why.)
+        mirrored yet.
       </p>
 
       <h2>Connecting your own agent</h2>
@@ -188,9 +184,8 @@ export default function DocsOverviewPage() {
       <h2>How the three planes fit</h2>
       <p>
         Authority lives on Sepolia (ENSv2). Enforcement is an off-chain service that watches
-        Sepolia and propagates — never originates — permission into a signed Arc anchor (and, once
-        Privy authorizes Arc for this app, a matching Privy wallet policy too). Money moves on Arc,
-        checked against that anchor on every spend. Full diagram at{" "}
+        Sepolia and propagates — never originates — permission into a signed Arc anchor. Money
+        moves on Arc, checked against that anchor on every spend. Full diagram at{" "}
         <a href="/docs/architecture">/docs/architecture</a>.
       </p>
     </Prose>

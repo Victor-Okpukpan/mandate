@@ -66,30 +66,22 @@ export default function SecurityDocsPage() {
         deliberately kept independent of. Flagged here rather than assumed silently correct.
       </Callout>
 
-      <h2>Arc isn&rsquo;t yet on Privy&rsquo;s per-app relay allowlist</h2>
+      <h2>Arc transactions are signed by Privy, then broadcast separately</h2>
       <p>
         Verified live, not assumed: Privy&rsquo;s Wallet API authorizes which chains an app may
-        call <code>eth_sendTransaction</code> on, and Arc testnet isn&rsquo;t on that list for this
-        app yet — it 401s with <code>App is not authorized to transact on chain
+        call <code>eth_sendTransaction</code> on directly, and this app is not authorized for Arc
+        testnet — it 401s with <code>App is not authorized to transact on chain
         eip155:5042002</code>. <code>eth_signTransaction</code> sits on the other side of that
         gate, since it never touches the network, so <code>agents/shared/src/signer.ts</code>{" "}
         builds the Arc transaction itself, has Privy sign it, and broadcasts the raw bytes via
         Arc&rsquo;s own RPC. The private key never leaves Privy&rsquo;s custody; only the broadcast
-        step moves. It runs into the same wall one layer up, though: Privy&rsquo;s policy engine
-        can&rsquo;t evaluate a condition against a chain it hasn&rsquo;t authorized either, so ANY
-        policy attached to a wallet blocks it from signing on Arc at all — not just non-compliant
-        payments, every payment. Since every real payment this system makes is an Arc transaction,
-        a policy-protected agent wallet currently cannot pay, full stop.
+        step moves.
       </p>
       <p>
-        Rather than leave every agent wallet non-functional, <code>ENFORCER_PRIVY_POLICY_SYNC</code>{" "}
-        (off by default) governs this: the Enforcer stops attaching Privy policies and strips any
-        leftover ones instead, and on-chain enforcement (<code>MandateAnchor.assertSpend</code> /{" "}
-        <code>AgentTreasury.payTo</code>) becomes the sole layer for Arc payments in the meantime —
-        still fully real, still fails closed, still what actually reverts a bad payment; it&rsquo;s
-        the off-chain pre-filter that&rsquo;s sitting out, not the enforcement. Flip the flag to{" "}
-        <code>true</code> the moment Privy authorizes Arc for this app; nothing else about the
-        sync logic changes.
+        Every check a payment has to clear — the per-tx cap, the recipient allowlist, the
+        revocation flag, the rolling budget — is enforced entirely on-chain, by{" "}
+        <code>MandateAnchor.assertSpend</code> / <code>AgentTreasury.payTo</code>. That&rsquo;s the
+        sole enforcement layer this deployment runs.
       </p>
 
       <h2>Centralization, disclosed rather than hidden</h2>

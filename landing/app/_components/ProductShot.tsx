@@ -5,10 +5,9 @@
  * this is deliberately NOT a diagram. It's two mocked-up windows, the same structure Safe uses
  * (a wide dashboard panel + a narrower card overlapping its corner), showing the two real things
  * this product does: list an org's mandates, and show the on-chain check that actually guards one
- * of them. Not a Privy policy card — Arc isn't yet on Privy's per-app relay allowlist, so a
- * wallet's Privy policy currently has to sit disabled for it to be able to pay at all (see
- * `/docs/security`); showing one here would claim a layer that isn't the one doing the work today.
- * `MandateAnchor.assertSpend` is what's actually authoritative right now.
+ * of them. `MandateAnchor.assertSpend` is what's actually authoritative — the only enforcement
+ * layer this deployment runs, so that's the card shown, not a stand-in for a layer that isn't
+ * doing the work.
  */
 
 function WindowChrome({ url }: { url: string }) {

@@ -4,11 +4,10 @@ One process, every org. `orgSupervisor.ts` watches `MandateOrgFactory` (Sepolia)
 `ArcVaultFactory` (Arc) for `OrgCreated`/`VaultCreated`, and starts one registrar watcher + one
 heartbeat loop per org it can verify — no restart needed when a new org is created through the
 onboarding wizard, since that's the entire point of self-serve onboarding (HOW-IT-WORKS.md §4).
-Each watcher propagates its org's issuances, amendments, and revocations into two independent
-enforcement points: a Privy conditional policy, and a signed `MandateAnchor.syncMandate` call on
-Arc. A propagator, not an authority — every write is EIP-712 signed and independently reproducible
-from the Sepolia state it mirrors. See [`ARCHITECTURE.md`](../ARCHITECTURE.md) for the full
-three-plane picture.
+Each watcher propagates its org's issuances, amendments, and revocations into a signed
+`MandateAnchor.syncMandate` call on Arc. A propagator, not an authority — every write is EIP-712
+signed and independently reproducible from the Sepolia state it mirrors. See
+[`ARCHITECTURE.md`](../ARCHITECTURE.md) for the full three-plane picture.
 
 Falls back to watching a single hard-coded registrar/anchor/treasury
 (`SEPOLIA_MANDATE_REGISTRAR`/`ARC_MANDATE_ANCHOR`/`ARC_AGENT_TREASURY`) when
@@ -45,7 +44,7 @@ cast wallet new-mnemonic   # or: cast wallet import mandate-enforcer --interacti
 
 `pnpm dev` above is for local development only — it exits when your terminal does. Every mandate
 issued while nothing is running this process sits real on Sepolia with no enforcement mirrored to
-Arc/Privy. See `enforcer/deploy/README.md` to run it as a persistent systemd service on a VPS.
+Arc. See `enforcer/deploy/README.md` to run it as a persistent systemd service on a VPS.
 
 ## What it does, in order
 
@@ -64,10 +63,8 @@ Arc/Privy. See `enforcer/deploy/README.md` to run it as a persistent systemd ser
    orgs, since nonces are per-`(anchor, agent)` not per-agent alone), and resolves the agent's
    Privy server wallet via a shared, TTL-cached `walletApi.getWallets()` lookup (address → wallet
    id, live — no local file to keep in sync, and shared across every org this process watches
-   rather than refetched per sync) to sync or revoke its policy: a live mandate gets one `ALLOW`
-   rule ANDing the treasury address, the per-tx cap, and the recipient allowlist, then `DENY *`; a
-   revoked one gets rewritten straight to `DENY *` — the kill switch's off-chain half, independent
-   of the on-chain anchor flip.
+   rather than refetched per sync) to clear any policy left attached to it, so the on-chain anchor
+   flip above stays the only thing a wallet's spending is actually checked against.
 5. **Heartbeat.** Per org, every `MAX_STALENESS_SECONDS / 3`, signs and submits a short-lived
    heartbeat for every currently-live agent, so `assertSpend`'s fail-closed staleness check never
    trips on a healthy Enforcer.
@@ -100,7 +97,7 @@ Two scripts close it, opt-in:
 After both, this Enforcer is the only thing that can write to an agent's wallet — verified live
 this session: an unauthenticated `wallets().update()` against an owned wallet 401s, and the exact
 same call with `authorization_context: { authorization_private_keys: [...] }` succeeds. This is
-deliberately a single 1-of-1 tier scoped to routine policy sync, not the human multi-signer tiers
-`web/lib/approvals.ts` builds on Privy key quorums for org-level actions — the Enforcer needs to
-sync a policy on every mandate amendment without waiting on a human, and a wider quorum here would
-mean an amendment can't take effect until someone signs off on it reaching Privy at all.
+deliberately a single 1-of-1 tier scoped to routine, unattended writes, not the human multi-signer
+tiers `web/lib/approvals.ts` builds on Privy key quorums for org-level actions — the Enforcer needs
+to act on every mandate amendment without waiting on a human, and a wider quorum here would mean an
+amendment can't take effect until someone signs off on it reaching Privy at all.
