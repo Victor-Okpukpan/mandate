@@ -199,7 +199,7 @@ export function MandateDetailPanel({ node, state, addresses, displayName, onRevo
         {agentWallet ? (
           <p className="mt-1 flex items-center gap-1.5 text-[13px] text-tertiary">
             wallet
-            <MonoValue value={agentWallet} className="text-secondary" />
+            <MonoValue value={agentWallet} className="text-secondary" copyable />
           </p>
         ) : null}
         {budgetTotal ? (
@@ -242,7 +242,7 @@ export function MandateDetailPanel({ node, state, addresses, displayName, onRevo
         ) : (
           allowedRecipients.map((addr) => (
             <div key={addr} className="flex items-center justify-between py-2 text-[13px]">
-              <MonoValue value={addr} className="text-secondary" />
+              <MonoValue value={addr} className="text-secondary" copyable />
             </div>
           ))
         )}
@@ -271,7 +271,7 @@ export function MandateDetailPanel({ node, state, addresses, displayName, onRevo
           <Row label="Reputation" value="No feedback yet" />
         ) : null}
         {arcWallet && arcWallet.toLowerCase() !== (agentWallet ?? "").toLowerCase() ? (
-          <Row label="Separate Arc spending wallet" value={<MonoValue value={arcWallet} />} />
+          <Row label="Separate Arc spending wallet" value={<MonoValue value={arcWallet} copyable />} />
         ) : null}
       </Section>
 
