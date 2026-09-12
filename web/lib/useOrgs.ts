@@ -59,7 +59,17 @@ export function useOrgs() {
     async function load() {
       const result = await listOrgsDirect(sepoliaClient!, addresses.mandateOrgFactory!, fallbackBlock);
       if (cancelled) return;
-      setOrgs(result);
+      // Every poll tick builds a fresh array even when nothing changed — setting it unconditionally
+      // would re-render every consumer (and everything downstream of it) on a 15s cadence forever,
+      // which is exactly what caused a `/org/[name]` prefetch storm on the onboarding wizard: a
+      // failed Next.js prefetch isn't cached, so a re-render-every-15s loop kept re-attempting it
+      // until the tab ran out of connections (`ERR_INSUFFICIENT_RESOURCES`). Only commit a new
+      // array when the actual registrar set changed.
+      setOrgs((prev) => {
+        const prevKey = prev.map((o) => o.registrar).sort().join(",");
+        const nextKey = result.map((o) => o.registrar).sort().join(",");
+        return prevKey === nextKey ? prev : result;
+      });
       setOrgsLoading(false);
     }
     load().catch((e) => {
@@ -124,7 +134,13 @@ export function useOrgs() {
       const fallbackBlock = VAULT_FACTORY_DEPLOY_BLOCK === "earliest" ? 0n : VAULT_FACTORY_DEPLOY_BLOCK;
       const result = await listVaultsForAdmins(arcClient!, addresses.arcVaultFactory!, admins, fallbackBlock);
       if (cancelled) return;
-      setVaults(result);
+      // Same reasoning as the org poll above — don't commit a fresh array (and cascade a re-render)
+      // when the actual vault set hasn't changed.
+      setVaults((prev) => {
+        const prevKey = prev.map((v) => v.anchor).sort().join(",");
+        const nextKey = result.map((v) => v.anchor).sort().join(",");
+        return prevKey === nextKey ? prev : result;
+      });
       setVaultsChecked(true);
       setVaultsConfirmed(true);
     }

@@ -81,18 +81,37 @@ export function useMandateGraph(registrarAddress: Address | undefined, _fromBloc
       if (cancelled) return;
 
       setNodes((prev) => {
+        // Bail out with the SAME reference when nothing actually changed — the poll below runs
+        // every 15s regardless, and committing a fresh Map every tick would re-render every
+        // consumer on that cadence forever. That churn is exactly what caused a `/org/[name]`
+        // prefetch storm on the onboarding wizard: a failed Next.js prefetch isn't cached, so
+        // re-rendering its parent every 15s kept re-attempting it until the tab ran out of
+        // connections (`ERR_INSUFFICIENT_RESOURCES`). See `useOrgs`'s matching fix.
+        let changed = prev.size !== mandates.length;
         const next = new Map(prev);
         for (const m of mandates) {
-          next.set(m.node, {
-            node: m.node,
-            parentNode: m.parentNode === ROOT_PARENT ? null : m.parentNode,
-            agentWallet: m.agentWallet,
-            resolver: m.resolver,
-            expiry: m.terms.expiry,
-            revoked: m.revoked,
-          });
+          const parentNode = m.parentNode === ROOT_PARENT ? null : m.parentNode;
+          const existing = prev.get(m.node);
+          if (
+            !existing ||
+            existing.agentWallet !== m.agentWallet ||
+            existing.resolver !== m.resolver ||
+            existing.expiry !== m.terms.expiry ||
+            existing.revoked !== m.revoked ||
+            existing.parentNode !== parentNode
+          ) {
+            changed = true;
+            next.set(m.node, {
+              node: m.node,
+              parentNode,
+              agentWallet: m.agentWallet,
+              resolver: m.resolver,
+              expiry: m.terms.expiry,
+              revoked: m.revoked,
+            });
+          }
         }
-        return next;
+        return changed ? next : prev;
       });
       setLoading(false);
     }
