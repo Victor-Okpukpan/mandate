@@ -4,6 +4,7 @@ import { encodeFunctionData, namehash, type Address } from "viem";
 import {
   MandateRegistrarAbi,
   AgentTreasuryAbi,
+  MandateAnchorAbi,
   PermissionedResolverAbi,
   JobsAbi,
 } from "./abis/index.js";
@@ -47,6 +48,77 @@ function requireAddresses() {
   };
 }
 
+
+/** Both `AgentTreasury.payTo`/`fundJob`/`createJob` and the `MandateAnchor.assertSpend` check they
+ *  call internally revert with their own named custom errors — merge both ABIs so a decode attempt
+ *  can recognize either, regardless of which contract actually rejected the call. */
+const ARC_REVERT_ABI = [...AgentTreasuryAbi, ...MandateAnchorAbi];
+
+/**
+ * viem decodes a reverted custom error onto `err.cause.data` (`{ errorName, args }`), not onto
+ * `shortMessage` — that field stays the generic "The contract function ... reverted." regardless
+ * of whether decoding succeeded. Dig for the decoded name first; fall back to whatever message is
+ * available when it isn't a recognized custom error (an out-of-gas, a plain string revert, etc.).
+ */
+function describeError(err: unknown): string {
+  const data = (err as { cause?: { data?: { errorName?: string; args?: unknown[] } } })?.cause?.data;
+  if (data?.errorName) {
+    const args = data.args?.length ? `(${data.args.map(String).join(", ")})` : "";
+    return `${data.errorName}${args}`;
+  }
+  return err && typeof err === "object" && "shortMessage" in err
+    ? String((err as { shortMessage: unknown }).shortMessage)
+    : err instanceof Error
+      ? err.message
+      : String(err);
+}
+
+/**
+ * Submits an Arc call through the signer and reports what actually happened — not just a tx hash
+ * the agent has no way to interpret. Two distinct failure points, both covered:
+ *
+ * 1. **Pre-flight**: `signer.sendTransaction`'s own `estimateGas` step reverts before a hash ever
+ *    exists (the common case — a doomed call typically never gets broadcast at all). Caught here,
+ *    then replayed via `simulateContract` at the current block to decode the *real* reason —
+ *    `AgentTreasury__BudgetExceeded`, `MandateAnchor__NotAllowlisted`, etc.
+ * 2. **Post-broadcast**: the rarer case where a hash comes back but the transaction still reverts
+ *    on confirmation (a race against other pending state) — same decode, replayed at the exact
+ *    failing block instead of "latest".
+ *
+ * Either way this reads the real reason the real contract gave, the same way a block explorer
+ * would — not a client-side pre-check invented to guess at the rules ourselves.
+ */
+async function sendAndDescribe(
+  ctx: ToolContext,
+  send: () => Promise<`0x${string}`>,
+  replay: { address: Address; abi: typeof ARC_REVERT_ABI; functionName: string; args: readonly unknown[] },
+): Promise<string> {
+  let hash: `0x${string}`;
+  try {
+    hash = await send();
+  } catch (sendErr) {
+    try {
+      await ctx.clients.arc.simulateContract({ ...replay, account: ctx.signer.address } as never);
+      return `reverted before broadcast (reason unknown; replay didn't reproduce the failure) — ${describeError(sendErr)}`;
+    } catch (simErr) {
+      return `reverted before broadcast: ${describeError(simErr)}`;
+    }
+  }
+
+  const receipt = await ctx.clients.arc.waitForTransactionReceipt({ hash });
+  if (receipt.status === "success") return `succeeded — tx ${hash}`;
+
+  try {
+    await ctx.clients.arc.simulateContract({
+      ...replay,
+      account: ctx.signer.address,
+      blockNumber: receipt.blockNumber,
+    } as never);
+    return `reverted — tx ${hash} (reason unknown; replay didn't reproduce the failure)`;
+  } catch (err) {
+    return `reverted — tx ${hash}: ${describeError(err)}`;
+  }
+}
 
 export function buildMandatedAgentTools(ctx: ToolContext) {
   const readMyMandate = betaZodTool({
@@ -153,13 +225,14 @@ export function buildMandatedAgentTools(ctx: ToolContext) {
       const recipients = parseAllowHuman(allowHuman);
       const proof = recipients.length > 0 ? buildAllowlist(recipients).proofFor(to as Address) : [];
 
-      const data = encodeFunctionData({
-        abi: AgentTreasuryAbi,
-        functionName: "payTo",
-        args: [to as Address, toErc20Usdc(amountUsdc), proof],
-      });
-      const hash = await ctx.signer.sendTransaction("arc", { to: treasury, data });
-      return `payTo(${to}, ${amountUsdc}) submitted, tx ${hash} — check the receipt for revert reasons`;
+      const args = [to as Address, toErc20Usdc(amountUsdc), proof] as const;
+      const data = encodeFunctionData({ abi: AgentTreasuryAbi, functionName: "payTo", args });
+      const outcome = await sendAndDescribe(
+        ctx,
+        () => ctx.signer.sendTransaction("arc", { to: treasury, data }),
+        { address: treasury, abi: ARC_REVERT_ABI, functionName: "payTo", args },
+      );
+      return `payTo(${to}, ${amountUsdc}) ${outcome}`;
     },
   });
 
@@ -181,13 +254,20 @@ export function buildMandatedAgentTools(ctx: ToolContext) {
       // calls `fund` AS the treasury — so the treasury must also be the one that created the job,
       // or funding it would revert `Unauthorized()` on every attempt. See AgentTreasury.sol's
       // NatSpec on `createJob` for the full reasoning; this was a real bug, not a style choice.
-      const data = encodeFunctionData({
-        abi: AgentTreasuryAbi,
-        functionName: "createJob",
-        args: [provider as Address, evaluator as Address, expiredAt, description, "0x0000000000000000000000000000000000000000"],
-      });
-      const hash = await ctx.signer.sendTransaction("arc", { to: treasury, data });
-      return `job created via treasury.createJob, tx ${hash} — read the JobCreated event for the jobId, then call fund_job`;
+      const args = [
+        provider as Address,
+        evaluator as Address,
+        expiredAt,
+        description,
+        "0x0000000000000000000000000000000000000000",
+      ] as const;
+      const data = encodeFunctionData({ abi: AgentTreasuryAbi, functionName: "createJob", args });
+      const outcome = await sendAndDescribe(
+        ctx,
+        () => ctx.signer.sendTransaction("arc", { to: treasury, data }),
+        { address: treasury, abi: ARC_REVERT_ABI, functionName: "createJob", args },
+      );
+      return `create_job ${outcome} — if it succeeded, read the JobCreated event for the jobId, then call fund_job`;
     },
   });
 
@@ -213,13 +293,14 @@ export function buildMandatedAgentTools(ctx: ToolContext) {
       const recipients = parseAllowHuman(allowHuman);
       const proof = recipients.length > 0 ? buildAllowlist(recipients).proofFor(jobs as Address) : [];
 
-      const data = encodeFunctionData({
-        abi: AgentTreasuryAbi,
-        functionName: "fundJob",
-        args: [BigInt(jobId), toErc20Usdc(amountUsdc), proof],
-      });
-      const hash = await ctx.signer.sendTransaction("arc", { to: treasury, data });
-      return `fundJob(${jobId}, ${amountUsdc}) submitted, tx ${hash} — check the receipt for revert reasons`;
+      const args = [BigInt(jobId), toErc20Usdc(amountUsdc), proof] as const;
+      const data = encodeFunctionData({ abi: AgentTreasuryAbi, functionName: "fundJob", args });
+      const outcome = await sendAndDescribe(
+        ctx,
+        () => ctx.signer.sendTransaction("arc", { to: treasury, data }),
+        { address: treasury, abi: ARC_REVERT_ABI, functionName: "fundJob", args },
+      );
+      return `fundJob(${jobId}, ${amountUsdc}) ${outcome}`;
     },
   });
 
