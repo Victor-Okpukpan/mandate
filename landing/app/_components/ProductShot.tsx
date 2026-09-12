@@ -4,7 +4,11 @@
  * card chrome) rather than a rendered PNG. No nodes, no edges, no lines connecting anything —
  * this is deliberately NOT a diagram. It's two mocked-up windows, the same structure Safe uses
  * (a wide dashboard panel + a narrower card overlapping its corner), showing the two real things
- * this product does: list an org's mandates, and show the actual policy guarding one of them.
+ * this product does: list an org's mandates, and show the on-chain check that actually guards one
+ * of them. Not a Privy policy card — Arc isn't yet on Privy's per-app relay allowlist, so a
+ * wallet's Privy policy currently has to sit disabled for it to be able to pay at all (see
+ * `/docs/security`); showing one here would claim a layer that isn't the one doing the work today.
+ * `MandateAnchor.assertSpend` is what's actually authoritative right now.
  */
 
 function WindowChrome({ url }: { url: string }) {
@@ -94,31 +98,31 @@ export function ProductShot() {
         <div className="h-36 sm:h-40" aria-hidden />
       </div>
 
-      {/* Front panel: the Privy plane from the mandate drawer — the thing that makes this
-          product real rather than a claim. Overlaps only the blank floor above and hangs below
-          the back panel's own edge, same as Safe's mobile card overlapping its desktop shot. */}
+      {/* Front panel: the on-chain check from the mandate drawer's "On-chain protection" section —
+          the thing that makes this product real rather than a claim, and the layer that's actually
+          authoritative today. Overlaps only the blank floor above and hangs below the back panel's
+          own edge, same as Safe's mobile card overlapping its desktop shot. */}
       <div className="absolute -bottom-4 -right-4 w-64 overflow-hidden rounded-xl border border-border bg-surface shadow-xl sm:-right-8 sm:w-72">
         <div className="border-b border-border-subtle px-4 py-2.5">
           <p className="font-mono text-[10px] uppercase tracking-label text-tertiary">
-            Privy · signing policy
+            Arc · on-chain check
           </p>
         </div>
         <div className="px-4 py-3">
-          <p className="font-mono text-[11px] font-medium uppercase tracking-label text-live">Allow</p>
-          <p className="mt-1 font-mono text-[11px] text-secondary">eth_sendTransaction</p>
+          <p className="font-mono text-[11px] text-secondary">assertSpend()</p>
           <div className="mt-2 flex flex-col gap-1 border-l border-border-subtle pl-3">
             <span className="font-mono text-[10px] text-tertiary">
-              to <span className="text-secondary">eq</span> AgentTreasury
+              revoked <span className="text-secondary">false</span>
             </span>
             <span className="font-mono text-[10px] text-tertiary">
-              payTo.amount <span className="text-secondary">lte</span> 50.00
+              per-tx cap <span className="text-secondary">$50.00</span>
             </span>
             <span className="font-mono text-[10px] text-tertiary">
-              payTo.to <span className="text-secondary">in</span> [1 recipient]
+              allowlist <span className="text-secondary">1 recipient</span>
             </span>
           </div>
-          <p className="mt-3 font-mono text-[11px] font-medium uppercase tracking-label text-revoked">
-            Deny *
+          <p className="mt-3 font-mono text-[11px] font-medium uppercase tracking-label text-live">
+            ✓ payment allowed
           </p>
         </div>
       </div>

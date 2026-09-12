@@ -20,14 +20,15 @@ in `agents/` still resolves it via the pnpm workspace, not the published copy.
 ## Core — framework-agnostic
 
 ```ts
-import { connectMandate, makePrivySigner, makeChainClients } from "mandate-agent-sdk";
-import { PrivyClient } from "@privy-io/node";
-
-const privy = new PrivyClient({ appId: process.env.PRIVY_APP_ID!, appSecret: process.env.PRIVY_APP_SECRET! });
+import { connectMandate, makeApiSigner } from "mandate-agent-sdk";
 
 const mandate = connectMandate({
   ensName: "researcher.acme.eth",
-  signer: makePrivySigner(privy, walletId, walletAddress, makeChainClients().arc),
+  signer: makeApiSigner({
+    token: process.env.MANDATE_AGENT_TOKEN!, // from your org admin — see "Signers" below
+    address: "0x6375e286A9bDe6f1529f3a9895684F7178235a5c",
+    baseUrl: "https://app.runmandate.xyz",
+  }),
 });
 
 // Read your own limits live — never hard-code them, they can change or be revoked.
@@ -45,10 +46,18 @@ loop already lives — a LangChain tool, a raw OpenAI function-calling loop, a c
 
 ### Signers
 
-- `makePrivySigner(privy, walletId, address, arcClient)` — production path. The private key never
-  leaves Privy's custody. `arcClient` is required for Arc sends: Arc isn't yet on Privy's per-app
-  relay allowlist, so this signs the transaction with Privy and broadcasts the raw bytes itself
-  (see the security docs) — pass a `PublicClient` for Arc, e.g. `makeChainClients().arc`.
+- `makeApiSigner({ token, address, baseUrl })` — **the one external integrators should use.** Your
+  org's admin generates a connection token from the mandate's "Connect your agent" panel on
+  runmandate.xyz; it's scoped by signature to exactly your one agent wallet and grants nothing
+  beyond what that wallet's own on-chain mandate already allows. This signer never touches Privy
+  directly — it posts to the app's relay endpoint, which is the only place the platform's own Privy
+  credentials are ever used, and only on behalf of the wallet your token names.
+- `makePrivySigner(privy, walletId, address, arcClient)` — direct Privy signing. Requires the
+  platform's own `PRIVY_APP_ID`/`PRIVY_APP_SECRET`, which controls every wallet on the whole
+  platform — appropriate for this repo's own services (the Enforcer, the demo agents), **not** for
+  an external org's agent process. `arcClient` is required for Arc sends: Arc isn't yet on Privy's
+  per-app relay allowlist, so this signs the transaction with Privy and broadcasts the raw bytes
+  itself (see the security docs) — pass a `PublicClient` for Arc, e.g. `makeChainClients().arc`.
 - `makeDevSigner(privateKey, rpcUrls)` — Anvil/local testing only. Never point this at Sepolia or
   Arc testnet with a real key.
 

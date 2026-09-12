@@ -59,11 +59,13 @@ npm install mandate-agent-sdk
 ```
 
 ```ts
-import { connectMandate, makePrivySigner, makeChainClients } from "mandate-agent-sdk";
+import { connectMandate, makeApiSigner } from "mandate-agent-sdk";
 
 const mandate = connectMandate({
   ensName: "researcher.acme.eth",
-  signer: makePrivySigner(privy, walletId, walletAddress, makeChainClients().arc),
+  // Token comes from the mandate's "Connect your agent" panel on runmandate.xyz — scoped to this
+  // one wallet, never the platform's own Privy credentials.
+  signer: makeApiSigner({ token: agentToken, address: walletAddress, baseUrl: "https://app.runmandate.xyz" }),
 });
 
 const terms = await mandate.readMyMandate(); // live from ENS, never cached

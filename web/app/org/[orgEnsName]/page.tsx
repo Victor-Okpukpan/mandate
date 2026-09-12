@@ -388,6 +388,8 @@ function OrgOverview({ org }: { org: OrgWithVault }) {
                 ? `${labels.get(selectedNode.node)}.${org.orgEnsName}`
                 : org.orgEnsName
             }
+            registrar={org.registrar}
+            isOrgAdmin={isAdmin}
             onRevoke={isAdmin ? () => handleRevoke(selectedNode.node) : undefined}
             revoking={revokingNode === selectedNode.node && isPending}
           />

@@ -281,6 +281,9 @@ importers:
       geist:
         specifier: ^1.7.2
         version: 1.7.2(next@16.3.4(@types/node@22.20.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))
+      mandate-agent-sdk:
+        specifier: workspace:*
+        version: link:../packages/agent-sdk
       motion:
         specifier: ^12.6.3
         version: 12.43.0(@emotion/is-prop-valid@1.4.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)

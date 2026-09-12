@@ -1,13 +1,14 @@
 "use client";
 
-import type { Hex } from "viem";
+import { useState } from "react";
+import type { Address, Hex } from "viem";
 import { StatusPill, type MandateState } from "@mandate/ui/components/StatusPill";
 import { MonoValue } from "@mandate/ui/components/MonoValue";
 import { Countdown } from "@mandate/ui/components/Countdown";
 import { fromErc20Usdc } from "@mandate/shared/decimals";
 import { BINDING_KEYS } from "@mandate/shared/ensKeys";
 import { useMandateDetail } from "../../lib/useMandateDetail";
-import { usePrivyMandateStatus, type PrivyPolicyRule } from "../../lib/usePrivyMandateStatus";
+import { usePrivyMandateStatus, useOptionalPrivy, type PrivyPolicyRule } from "../../lib/usePrivyMandateStatus";
 import { useIdentityVerification } from "../../lib/useIdentityVerification";
 import { useReputation } from "../../lib/useReputation";
 import type { DeployedAddresses } from "../../lib/addresses";
@@ -19,6 +20,9 @@ interface MandateDetailPanelProps {
   /** e.g. "researcher.acme.eth" — falls back to the raw node hash when the caller hasn't
    *  resolved a label yet (labels come from a separate multicall; see `useMandateLabels`). */
   displayName?: string;
+  /** Needed only to issue a scoped agent token — see `ConnectAgentSection` below. */
+  registrar?: Address;
+  isOrgAdmin?: boolean;
   onRevoke?: () => void;
   revoking?: boolean;
 }
@@ -114,6 +118,82 @@ function PolicyRuleRow({ rule }: { rule: PrivyPolicyRule }) {
   );
 }
 
+/**
+ * Issues a scoped `mandate-agent-sdk` connection token for this one agent wallet — the admin-only
+ * alternative to an external agent process ever holding this platform's own Privy credentials. See
+ * `web/app/api/agents/connect/route.ts` for the ownership check and `web/lib/agentToken.ts` for
+ * what the token actually grants (nothing beyond what the wallet's own on-chain mandate allows).
+ */
+function ConnectAgentSection({ registrar, ensName, agentWallet }: { registrar: Address; ensName: string; agentWallet: Address }) {
+  const privy = useOptionalPrivy();
+  const [state, setState] = useState<{ status: "idle" } | { status: "loading" } | { status: "error"; message: string } | { status: "done"; token: string }>({
+    status: "idle",
+  });
+
+  async function handleConnect() {
+    setState({ status: "loading" });
+    try {
+      if (!privy) throw new Error("Privy isn't configured on this deployment.");
+      const accessToken = await privy.getAccessToken();
+      if (!accessToken) throw new Error("Sign in first.");
+      const res = await fetch("/api/agents/connect", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${accessToken}`, "content-type": "application/json" },
+        body: JSON.stringify({ registrar, ensName }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error ?? `Request failed (${res.status})`);
+      setState({ status: "done", token: body.token as string });
+    } catch (err) {
+      setState({ status: "error", message: err instanceof Error ? err.message : String(err) });
+    }
+  }
+
+  const snippet = state.status === "done"
+    ? `import { connectMandate, makeApiSigner } from "mandate-agent-sdk";
+
+const signer = makeApiSigner({
+  token: "${state.status === "done" ? state.token : ""}",
+  address: "${agentWallet}",
+  baseUrl: "${typeof window !== "undefined" ? window.location.origin : "https://app.runmandate.xyz"}",
+});
+
+const agent = await connectMandate({ ensName: "${ensName}", signer });
+await agent.pay(recipient, "10.00");`
+    : "";
+
+  return (
+    <Section title="Connect your agent" subtitle="A scoped credential for this wallet only — never this platform's own Privy keys.">
+      {state.status === "done" ? (
+        <div className="py-3">
+          <p className="text-[13px] text-secondary">
+            Token issued. It only ever authorizes <MonoValue value={agentWallet} className="text-secondary" copyable /> —
+            paste it into your agent's environment and drop the snippet below into your own runtime.
+          </p>
+          <div className="mt-2 flex items-center justify-between gap-2 rounded-lg border border-border-subtle bg-surface-2 px-3 py-2">
+            <MonoValue value={state.token} truncate={16} copyable />
+          </div>
+          <pre className="mt-3 overflow-x-auto rounded-lg border border-border-subtle bg-surface-2 px-3 py-2.5 text-[11.5px] leading-relaxed text-secondary">
+            {snippet}
+          </pre>
+        </div>
+      ) : (
+        <div className="py-3">
+          <button
+            type="button"
+            onClick={handleConnect}
+            disabled={state.status === "loading"}
+            className="inline-flex h-9 w-fit items-center rounded-lg border border-border px-4 text-[13px] font-medium text-primary transition-colors hover:bg-surface-2 disabled:pointer-events-none disabled:opacity-40"
+          >
+            {state.status === "loading" ? "Generating…" : "Generate connection token"}
+          </button>
+          {state.status === "error" ? <p className="mt-2 text-[12.5px] text-revoked">{state.message}</p> : null}
+        </div>
+      )}
+    </Section>
+  );
+}
+
 function Section({
   title,
   subtitle,
@@ -155,7 +235,7 @@ function formatDate(unixSeconds: number): string {
  * than the raw `mandate.budget.perTx`-style ENS key names — those still exist, just folded into
  * the "Raw record" disclosure at the bottom for anyone who wants to verify this isn't a UI story.
  */
-export function MandateDetailPanel({ node, state, addresses, displayName, onRevoke, revoking }: MandateDetailPanelProps) {
+export function MandateDetailPanel({ node, state, addresses, displayName, registrar, isOrgAdmin, onRevoke, revoking }: MandateDetailPanelProps) {
   const {
     mandate,
     agentWallet,
@@ -274,6 +354,10 @@ export function MandateDetailPanel({ node, state, addresses, displayName, onRevo
           <Row label="Separate Arc spending wallet" value={<MonoValue value={arcWallet} copyable />} />
         ) : null}
       </Section>
+
+      {isOrgAdmin && registrar && agentWallet && state !== "revoked" && displayName ? (
+        <ConnectAgentSection registrar={registrar} ensName={displayName} agentWallet={agentWallet} />
+      ) : null}
 
       <Section title="Off-chain protection" subtitle="Privy checks the recipient and payment size before the agent's wallet ever signs.">
         {!privy.privyConfigured ? (

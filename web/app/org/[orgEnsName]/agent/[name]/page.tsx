@@ -8,6 +8,7 @@ import { SkeletonRows } from "@mandate/ui/components/Skeleton";
 import { useSelectedOrg } from "@/lib/useSelectedOrg";
 import { mandateStateOf, useMandateGraph } from "@/lib/useMandateGraph";
 import { useMandateLabels } from "@/lib/useMandateLabels";
+import { useIsOrgAdmin } from "@/lib/useIsOrgAdmin";
 import { MandateDetailPanel } from "@/app/_components/MandateDetailPanel";
 import { OrgNotFound } from "@/app/_components/OrgNotFound";
 
@@ -46,6 +47,7 @@ export default function AgentDetailPage({
 function AgentDetailInner({ node, org }: { node: Hex; org: OrgWithVault }) {
   const { nodes } = useMandateGraph(org.registrar, org.createdAtBlock);
   const labels = useMandateLabels([node], org.registrar);
+  const { isAdmin } = useIsOrgAdmin(org.registrar);
   const now = Math.floor(Date.now() / 1000);
   const match = nodes.find((n) => n.node === node);
   const state = match ? mandateStateOf(match, now) : "stale";
@@ -66,6 +68,8 @@ function AgentDetailInner({ node, org }: { node: Hex; org: OrgWithVault }) {
           state={state}
           addresses={detailAddresses}
           displayName={label ? `${label}.${org.orgEnsName}` : org.orgEnsName}
+          registrar={org.registrar}
+          isOrgAdmin={isAdmin}
         />
       </div>
     </div>

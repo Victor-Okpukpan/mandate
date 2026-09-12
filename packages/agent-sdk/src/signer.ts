@@ -88,6 +88,45 @@ export function makePrivySigner(
   };
 }
 
+const CHAIN_NAME = {
+  sepolia: "sepolia",
+  arc: "arc",
+} as const;
+
+/**
+ * The scoped-credential signer: an external agent process never holds this platform's
+ * `PRIVY_APP_SECRET` (which controls every wallet on the whole platform). Instead the org admin
+ * calls `POST /api/agents/connect` once (authenticated, in the browser) to get a token naming
+ * exactly this agent's wallet, and this signer just POSTs that token plus the transaction to
+ * `POST /api/agents/relay` — the one server route that still touches Privy, scoped by the token's
+ * signature to that single wallet. Nothing here ever sees a Privy credential at all.
+ */
+export function makeApiSigner(opts: { token: string; address: Address; baseUrl: string }): AgentSigner {
+  const { token, address, baseUrl } = opts;
+  const relayUrl = new URL("/api/agents/relay", baseUrl).toString();
+  return {
+    address,
+    async sendTransaction(chain, tx) {
+      const res = await fetch(relayUrl, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          token,
+          chain: CHAIN_NAME[chain],
+          to: tx.to,
+          data: tx.data,
+          value: tx.value !== undefined ? tx.value.toString() : undefined,
+        }),
+      });
+      const body = (await res.json()) as { hash?: Hex; error?: string };
+      if (!res.ok || !body.hash) {
+        throw new Error(`makeApiSigner: relay request failed — ${body.error ?? res.statusText}`);
+      }
+      return body.hash;
+    },
+  };
+}
+
 /** Anvil/local-testing only. Never point this at Sepolia or Arc testnet with a real key. */
 export function makeDevSigner(privateKey: Hex, rpcUrls: { sepolia: string; arc: string }): AgentSigner {
   console.warn("⚠️  Using a local dev signer — Anvil-only, never a real network.");

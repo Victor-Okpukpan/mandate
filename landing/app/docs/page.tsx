@@ -119,15 +119,21 @@ export default function DocsOverviewPage() {
       </p>
       <ol>
         <li>
-          <strong>Get the connection details.</strong> The wallet ID and address a Privy server
-          wallet was provisioned with when you registered the agent, plus the org&rsquo;s registrar
-          and Arc addresses.
+          <strong>Generate a connection token.</strong> From the mandate&rsquo;s detail view,
+          &ldquo;Connect your agent&rdquo; issues a token scoped by signature to that one agent
+          wallet — never this platform&rsquo;s own Privy credentials, which control every wallet on
+          the whole platform. The token grants nothing beyond what that wallet&rsquo;s own on-chain
+          mandate already allows.
         </li>
         <li>
-          <strong>Connect.</strong> <code>connectMandate({"{"} ensName, signer {"}"})</code> resolves
-          the agent&rsquo;s own mandate live and returns <code>.readMyMandate()</code>,{" "}
+          <strong>Connect.</strong>{" "}
+          <code>connectMandate({"{"} ensName, signer: makeApiSigner({"{"} token, address, baseUrl {"}"}) {"}"})</code>{" "}
+          resolves the agent&rsquo;s own mandate live and returns <code>.readMyMandate()</code>,{" "}
           <code>.pay()</code>, <code>.checkTreasury()</code>, <code>.setStatus()</code> — plain
           async functions, callable from anywhere your agent&rsquo;s loop already lives.
+          <code>makeApiSigner</code> never talks to Privy directly; it posts to this app&rsquo;s
+          relay endpoint, the one place the platform&rsquo;s own credentials are ever used, and only
+          for the wallet your token names.
         </li>
         <li>
           <strong>Spend.</strong> <code>.pay(to, amount)</code> is the real path — it reverts

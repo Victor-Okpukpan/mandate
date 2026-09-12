@@ -11,6 +11,7 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
+    "mandate-agent-sdk": "workspace:*",
     "@mandate/shared": "workspace:*",
     "@mandate/ui": "workspace:*",
     "@privy-io/react-auth": "^3.40.0",
