@@ -6,11 +6,11 @@ import {
   AgentTreasuryAbi,
   PermissionedResolverAbi,
   JobsAbi,
-} from "@mandate/shared/abis";
-import { getArcAddresses, getSepoliaAddresses } from "@mandate/shared/addresses";
-import { buildAllowlist } from "@mandate/shared/merkle";
-import { toErc20Usdc, fromErc20Usdc } from "@mandate/shared/decimals";
-import { parseAllowHuman } from "@mandate/shared/allowHuman";
+} from "./abis/index.js";
+import { getArcAddresses, getSepoliaAddresses } from "./addresses.js";
+import { buildAllowlist } from "./merkle.js";
+import { toErc20Usdc, fromErc20Usdc } from "./decimals.js";
+import { parseAllowHuman } from "./allowHuman.js";
 import { readArcAnchor, readMandateByEnsName, type makeChainClients } from "./chainClients.js";
 import type { AgentSigner } from "./signer.js";
 

@@ -1,9 +1,12 @@
-import { createPublicClient, http, namehash, type Address, type Hex } from "viem";
+import { createPublicClient, http, namehash, type Address, type Hex, type PublicClient } from "viem";
 import { arcTestnet, sepolia } from "viem/chains";
-import { MandateAnchorAbi, MandateRegistrarAbi } from "@mandate/shared/abis";
-import { getRpcUrls, getSepoliaAddresses, getArcAddresses } from "@mandate/shared/addresses";
+import { MandateAnchorAbi, MandateRegistrarAbi } from "./abis/index.js";
+import { getRpcUrls, getSepoliaAddresses, getArcAddresses } from "./addresses.js";
 
-export function makeChainClients() {
+/** Explicit return type, not inferred — `createPublicClient`'s inferred type pulls in viem's
+ *  internal module paths, which `tsc --declaration` (needed to publish this package) can't emit a
+ *  portable `.d.ts` for otherwise. */
+export function makeChainClients(): { sepolia: PublicClient; arc: PublicClient } {
   const rpc = getRpcUrls();
   return {
     sepolia: createPublicClient({ chain: sepolia, transport: http(rpc.sepolia) }),

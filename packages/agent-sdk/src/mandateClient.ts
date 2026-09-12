@@ -1,9 +1,9 @@
 import { encodeFunctionData, type Address, type Hex } from "viem";
-import { AgentTreasuryAbi, PermissionedResolverAbi } from "@mandate/shared/abis";
-import { getArcAddresses } from "@mandate/shared/addresses";
-import { buildAllowlist } from "@mandate/shared/merkle";
-import { toErc20Usdc, fromErc20Usdc } from "@mandate/shared/decimals";
-import { parseAllowHuman } from "@mandate/shared/allowHuman";
+import { AgentTreasuryAbi, PermissionedResolverAbi } from "./abis/index.js";
+import { getArcAddresses } from "./addresses.js";
+import { buildAllowlist } from "./merkle.js";
+import { toErc20Usdc, fromErc20Usdc } from "./decimals.js";
+import { parseAllowHuman } from "./allowHuman.js";
 import { makeChainClients, readMandateByEnsName } from "./chainClients.js";
 import type { AgentSigner } from "./signer.js";
 

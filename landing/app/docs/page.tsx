@@ -138,9 +138,8 @@ export default function DocsOverviewPage() {
       <p>
         An optional adapter, <code>mandate-agent-sdk/anthropic</code>, wraps the same calls in
         Anthropic&rsquo;s Tool Runner schema for anyone already on Claude — a convenience layer,
-        not the core. One honest gap: this package isn&rsquo;t yet published to the public npm
-        registry; it resolves via this repo&rsquo;s own workspace today. See{" "}
-        <a href="/docs/roadmap">/docs/roadmap</a>.
+        not the core. Published on npm, zero dependency on this repo:{" "}
+        <code>npm install mandate-agent-sdk</code>.
       </p>
 
       <h2>The problem</h2>

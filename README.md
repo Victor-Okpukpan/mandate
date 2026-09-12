@@ -50,8 +50,13 @@ Flow).
 
 Registering an agent gets it a mandate and a wallet — it doesn't run anything. The agent is
 whatever you already have: an LLM loop, a cron job, your own stack.
-[`mandate-agent-sdk`](./packages/agent-sdk) (`packages/agent-sdk/`) is the integration surface
-between the two, and it's framework-agnostic on purpose — no LLM dependency in its core:
+[`mandate-agent-sdk`](https://www.npmjs.com/package/mandate-agent-sdk) is the integration surface
+between the two, published on npm and framework-agnostic on purpose — no LLM dependency in its
+core, and no dependency on this monorepo either:
+
+```bash
+npm install mandate-agent-sdk
+```
 
 ```ts
 import { connectMandate, makePrivySigner, makeChainClients } from "mandate-agent-sdk";
@@ -69,8 +74,8 @@ Call `.pay()` / `.readMyMandate()` / `.checkTreasury()` from wherever your agent
 lives. `mandate-agent-sdk/anthropic` is a thin optional adapter wrapping the same calls in
 Anthropic's Tool Runner schema, for anyone already on Claude — not the core, and not required.
 `agents/mandated` (a real Claude-driven runtime) and `agents/demo-spend` (a no-LLM stand-in) are
-both built on this package; see [`packages/agent-sdk/README.md`](./packages/agent-sdk/README.md)
-for the full API. **Not yet published to npm** — see `/docs/roadmap`.
+both built on this package (via the workspace, not the published copy); see
+[`packages/agent-sdk/README.md`](./packages/agent-sdk/README.md) for the full API.
 
 ## What each sponsor technology actually does here
 

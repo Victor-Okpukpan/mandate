@@ -6,13 +6,16 @@ wallet. This package is how *your* agent — whatever it already is — reads th
 against it. It has no opinion about which LLM, framework, or runtime you use, and no LLM dependency
 at all in its core.
 
-## Not yet published
+## Install
 
-This resolves today via the pnpm workspace (`workspace:*`) inside this monorepo, not from the
-public npm registry — flip `private` to `false` in `package.json` and `npm publish` is the literal
-next step, once `@mandate/shared` (the ABIs/addresses/decimals helpers this package depends on) is
-either published alongside it or vendored in. Disclosed here rather than implied; see
-[`/docs/roadmap`](https://runmandate.xyz/docs/roadmap).
+```bash
+npm install mandate-agent-sdk
+```
+
+Published, standalone, zero dependency on this monorepo — its ABI/address/decimals/merkle helpers
+are vendored in directly (see the top of each file under `src/`) rather than imported from
+`@mandate/shared`, specifically so this works outside this repo. Inside this monorepo, everything
+in `agents/` still resolves it via the pnpm workspace, not the published copy.
 
 ## Core — framework-agnostic
 

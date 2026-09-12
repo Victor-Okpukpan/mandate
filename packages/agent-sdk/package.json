@@ -1,23 +1,49 @@
 {
   "name": "mandate-agent-sdk",
   "version": "0.1.0",
-  "private": true,
+  "private": false,
   "description": "Framework-agnostic SDK for an AI agent to read its own ENS spending mandate and pay against it on Arc — plug into any agent runtime.",
   "license": "MIT",
   "type": "module",
+  "keywords": ["ai-agent", "ens", "arc", "privy", "wallet", "agentic-payments", "web3"],
+  "homepage": "https://runmandate.xyz",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/victor-okpukpan/mandate",
+    "directory": "packages/agent-sdk"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": ["dist"],
   "exports": {
-    ".": "./src/index.ts",
-    "./anthropic": "./src/anthropic.ts",
-    "./chainClients": "./src/chainClients.ts",
-    "./signer": "./src/signer.ts",
-    "./mandateClient": "./src/mandateClient.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./anthropic": {
+      "types": "./dist/anthropic.d.ts",
+      "default": "./dist/anthropic.js"
+    },
+    "./chainClients": {
+      "types": "./dist/chainClients.d.ts",
+      "default": "./dist/chainClients.js"
+    },
+    "./signer": {
+      "types": "./dist/signer.d.ts",
+      "default": "./dist/signer.js"
+    },
+    "./mandateClient": {
+      "types": "./dist/mandateClient.d.ts",
+      "default": "./dist/mandateClient.js"
+    }
   },
   "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "prepublishOnly": "pnpm run build",
     "lint": "tsc --noEmit"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",
-    "@mandate/shared": "workspace:*",
     "@privy-io/node": "0.34.0",
     "viem": "^2.56.3",
     "zod": "^4.5.4"
