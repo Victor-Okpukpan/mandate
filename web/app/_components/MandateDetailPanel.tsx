@@ -11,7 +11,10 @@ import { useMandateDetail } from "../../lib/useMandateDetail";
 import { usePrivyMandateStatus, useOptionalPrivy, type PrivyPolicyRule } from "../../lib/usePrivyMandateStatus";
 import { useIdentityVerification } from "../../lib/useIdentityVerification";
 import { useReputation } from "../../lib/useReputation";
+import { usePaymentsFeed } from "../../lib/usePaymentsFeed";
 import type { DeployedAddresses } from "../../lib/addresses";
+
+const ARC_EXPLORER_TX = "https://testnet.arcscan.app/tx";
 
 interface MandateDetailPanelProps {
   node: Hex;
@@ -189,6 +192,47 @@ await agent.pay(recipient, "10.00");`
           </button>
           {state.status === "error" ? <p className="mt-2 text-[12.5px] text-revoked">{state.message}</p> : null}
         </div>
+      )}
+    </Section>
+  );
+}
+
+/**
+ * This agent's own slice of the org-wide `AgentSpent` feed (`usePaymentsFeed`), each row linking
+ * straight to Arcscan — proof a payment actually landed, not just a UI claim. Live-only, same as
+ * the feed it filters: a page reload loses rows older than the recent-window seed, since Arc's
+ * public RPC won't serve a real historical log range (see `usePaymentsFeed`'s own NatSpec).
+ */
+function TransactionHistorySection({ agentTreasury, agentWallet }: { agentTreasury: Address; agentWallet: Address }) {
+  const { rows, loading } = usePaymentsFeed(agentTreasury);
+  const mine = rows.filter((r) => r.agent.toLowerCase() === agentWallet.toLowerCase());
+
+  return (
+    <Section title="Transaction history" subtitle="Live from Arc — reload loses anything older than a few thousand blocks.">
+      {loading ? (
+        <p className="py-3 text-[13px] text-tertiary">Loading…</p>
+      ) : mine.length === 0 ? (
+        <p className="py-3 text-[13px] text-tertiary">No payments yet. A spend lands here live.</p>
+      ) : (
+        mine.map((r) => (
+          <div key={`${r.txHash}-${r.recipient}-${r.amount}`} className="flex items-center justify-between gap-4 py-2.5 text-[13px]">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="text-tertiary">to</span>
+              <MonoValue value={r.recipient} className="text-secondary" copyable />
+            </div>
+            <div className="flex shrink-0 items-center gap-3">
+              <span className="font-mono tnum text-primary">${fromErc20Usdc(r.amount)}</span>
+              <a
+                href={`${ARC_EXPLORER_TX}/${r.txHash}`}
+                target="_blank"
+                rel="noreferrer"
+                className="text-[12px] text-accent underline-offset-2 hover:underline"
+              >
+                View →
+              </a>
+            </div>
+          </div>
+        ))
       )}
     </Section>
   );
@@ -400,6 +444,10 @@ export function MandateDetailPanel({ node, state, addresses, displayName, regist
         )}
         {owed ? <Row label="Owed back to the treasury" value={`$${owed} USDC`} hint="A short-term credit facility, not overspending — see the docs." /> : null}
       </Section>
+
+      {agentWallet && addresses.agentTreasury ? (
+        <TransactionHistorySection agentTreasury={addresses.agentTreasury} agentWallet={agentWallet} />
+      ) : null}
 
       <details className="group">
         <summary className="cursor-pointer text-[12px] font-medium text-tertiary transition-colors hover:text-secondary">
