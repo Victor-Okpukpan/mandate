@@ -110,6 +110,39 @@ export default function DocsOverviewPage() {
         enforcement hasn&rsquo;t been mirrored yet.
       </p>
 
+      <h2>Connecting your own agent</h2>
+      <p>
+        Registering an agent gets it a mandate and a wallet — it doesn&rsquo;t run anything. The
+        agent itself is whatever you already have: an LLM loop, a cron job, your own stack.{" "}
+        <code>mandate-agent-sdk</code> is the integration surface between the two — framework-
+        agnostic, no LLM dependency in its core.
+      </p>
+      <ol>
+        <li>
+          <strong>Get the connection details.</strong> The wallet ID and address a Privy server
+          wallet was provisioned with when you registered the agent, plus the org&rsquo;s registrar
+          and Arc addresses.
+        </li>
+        <li>
+          <strong>Connect.</strong> <code>connectMandate({"{"} ensName, signer {"}"})</code> resolves
+          the agent&rsquo;s own mandate live and returns <code>.readMyMandate()</code>,{" "}
+          <code>.pay()</code>, <code>.checkTreasury()</code>, <code>.setStatus()</code> — plain
+          async functions, callable from anywhere your agent&rsquo;s loop already lives.
+        </li>
+        <li>
+          <strong>Spend.</strong> <code>.pay(to, amount)</code> is the real path — it reverts
+          on-chain if it violates the mandate. Nothing in the SDK pre-checks; the contract is the
+          actual enforcement.
+        </li>
+      </ol>
+      <p>
+        An optional adapter, <code>mandate-agent-sdk/anthropic</code>, wraps the same calls in
+        Anthropic&rsquo;s Tool Runner schema for anyone already on Claude — a convenience layer,
+        not the core. One honest gap: this package isn&rsquo;t yet published to the public npm
+        registry; it resolves via this repo&rsquo;s own workspace today. See{" "}
+        <a href="/docs/roadmap">/docs/roadmap</a>.
+      </p>
+
       <h2>The problem</h2>
       <p>
         Giving an AI agent a wallet is easy. Giving it a wallet whose authority is{" "}

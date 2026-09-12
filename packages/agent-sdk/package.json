@@ -1,22 +1,21 @@
 {
-  "name": "@mandate/agents-shared",
-  "version": "0.0.0",
+  "name": "mandate-agent-sdk",
+  "version": "0.1.0",
   "private": true,
-  "description": "Thin re-export of mandate-agent-sdk for this repo's own agent runtimes — see packages/agent-sdk for the actual implementation.",
+  "description": "Framework-agnostic SDK for an AI agent to read its own ENS spending mandate and pay against it on Arc — plug into any agent runtime.",
   "license": "MIT",
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./tools": "./src/tools.ts",
-    "./signer": "./src/signer.ts",
+    "./anthropic": "./src/anthropic.ts",
     "./chainClients": "./src/chainClients.ts",
-    "./runMandatedAgent": "./src/runMandatedAgent.ts"
+    "./signer": "./src/signer.ts",
+    "./mandateClient": "./src/mandateClient.ts"
   },
   "scripts": {
     "lint": "tsc --noEmit"
   },
   "dependencies": {
-    "mandate-agent-sdk": "workspace:*",
     "@anthropic-ai/sdk": "^0.123.0",
     "@mandate/shared": "workspace:*",
     "@privy-io/node": "0.34.0",

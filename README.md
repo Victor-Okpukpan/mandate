@@ -46,6 +46,32 @@ Flow).
    mirrors it onto the anchor and collapses the Privy policy to a bare `DENY *`. The agent's very
    next payment — even one that was valid a second earlier — dies on both layers.
 
+## Connecting your own agent
+
+Registering an agent gets it a mandate and a wallet — it doesn't run anything. The agent is
+whatever you already have: an LLM loop, a cron job, your own stack.
+[`mandate-agent-sdk`](./packages/agent-sdk) (`packages/agent-sdk/`) is the integration surface
+between the two, and it's framework-agnostic on purpose — no LLM dependency in its core:
+
+```ts
+import { connectMandate, makePrivySigner, makeChainClients } from "mandate-agent-sdk";
+
+const mandate = connectMandate({
+  ensName: "researcher.acme.eth",
+  signer: makePrivySigner(privy, walletId, walletAddress, makeChainClients().arc),
+});
+
+const terms = await mandate.readMyMandate(); // live from ENS, never cached
+const tx = await mandate.pay(vendorAddress, "1.00"); // reverts on-chain if it violates the mandate
+```
+
+Call `.pay()` / `.readMyMandate()` / `.checkTreasury()` from wherever your agent's loop already
+lives. `mandate-agent-sdk/anthropic` is a thin optional adapter wrapping the same calls in
+Anthropic's Tool Runner schema, for anyone already on Claude — not the core, and not required.
+`agents/mandated` (a real Claude-driven runtime) and `agents/demo-spend` (a no-LLM stand-in) are
+both built on this package; see [`packages/agent-sdk/README.md`](./packages/agent-sdk/README.md)
+for the full API. **Not yet published to npm** — see `/docs/roadmap`.
+
 ## What each sponsor technology actually does here
 
 ### ENS (ENSv2, Sepolia) — the authority plane
@@ -119,6 +145,7 @@ Three planes, one source of truth. Full writeup and diagram at
 contracts/            Foundry — factories, MandateRegistrar, MandateAnchor, AgentTreasury (+ tests)
 packages/shared/       ABIs, addresses, decimals/ENS-key/merkle/role/event helpers — TS
 packages/ui/            Design tokens, type scale, shared React primitives
+packages/agent-sdk/      mandate-agent-sdk — framework-agnostic "bring your own agent" integration surface
 landing/                 Next.js — the pitch + per-sponsor docs + roadmap (runmandate.xyz)
 web/                      Next.js — self-serve org onboarding + the mandate dashboard (app.runmandate.xyz)
 enforcer/                 Off-chain service syncing ENS mandates to Privy + Arc — see enforcer/deploy/README.md to run it persistently

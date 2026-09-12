@@ -3,7 +3,7 @@ import { buildMetadata } from "../../../lib/seo";
 
 const TITLE = "Roadmap — what's next for MANDATE";
 const DESCRIPTION =
-  "What the current version does not yet ship: agent-to-agent commerce via ERC-8183 escrow jobs, sub-delegation in the UI, and wallet-ownership quorums as a first-class step.";
+  "What the current version does not yet ship: agent-to-agent commerce via ERC-8183 escrow jobs, sub-delegation in the UI, wallet-ownership quorums as a first-class step, and publishing the agent SDK to npm.";
 
 export const metadata = buildMetadata({ title: TITLE, description: DESCRIPTION, path: "/docs/roadmap" });
 
@@ -40,6 +40,16 @@ export default function RoadmapDocsPage() {
         By default an agent&rsquo;s Privy wallet is ownerless — anyone holding the app secret could
         alter its policy. A signing quorum closes that so only the Enforcer can. It works today via
         setup scripts; the next version makes it a step in onboarding rather than an advanced path.
+      </p>
+
+      <h2>Publishing the agent SDK</h2>
+      <p>
+        <code>mandate-agent-sdk</code> (<a href="/docs">see /docs</a>) already exists as a clean,
+        framework-agnostic package — it just isn&rsquo;t on the public npm registry yet. It
+        resolves via this repo&rsquo;s own workspace today; publishing it for real means either
+        publishing <code>@mandate/shared</code> (its ABI/address/decimals dependency) alongside it
+        or vendoring those pieces in, so an integration genuinely needs nothing from this repo at
+        all.
       </p>
     </Prose>
   );

@@ -33,6 +33,11 @@ const FAQ: Array<{ question: string; answer: string }> = [
       "No. MANDATE issues and enforces authority — the ENS record, the provisioned wallet, the synced policy. The agent doing the work is whatever you already run: an LLM loop, a cron job, your own stack. Bring your own agent; this is the seatbelt.",
   },
   {
+    question: "How does my agent actually connect to its mandate?",
+    answer:
+      "A small SDK — read the mandate's live terms and call pay() from whatever your agent already is: LangChain, a raw OpenAI function-calling loop, a cron job. No LLM dependency in the core, and an optional adapter for Anthropic's Tool Runner if that's what you're already on.",
+  },
+  {
     question: "How do you revoke an AI agent's spending power?",
     answer:
       "One transaction on Sepolia. The Enforcer tears down the agent's Privy policy and flips its Arc anchor — its very next payment is refused, before it signs, and again on-chain if it somehow tried.",
@@ -238,7 +243,7 @@ export default function LandingPage() {
                 {
                   title: "Run",
                   description:
-                    "MANDATE doesn't supply the agent — whatever you already run (an LLM loop, a cron job, your own stack) picks up that wallet and gets to work. Two independent systems check every payment it tries to make.",
+                    "MANDATE doesn't supply the agent — a small SDK lets whatever you already run (an LLM loop, a cron job, your own stack) pick up that wallet and get to work. Two independent systems check every payment it tries to make.",
                 },
                 {
                   title: "Attenuate",
