@@ -1,7 +1,6 @@
 "use client";
 
 import { use } from "react";
-import { useRouter } from "next/navigation";
 import type { OrgWithVault } from "@mandate/shared/orgs";
 import { Card } from "@mandate/ui/components/Card";
 import { Display, Eyebrow } from "@mandate/ui/components/Type";
@@ -13,7 +12,6 @@ import { OrgNotFound } from "@/app/_components/OrgNotFound";
 import { RegisterAgentForm } from "@/app/onboard/_components/RegisterAgentForm";
 
 function RegisterAgent({ org }: { org: OrgWithVault }) {
-  const router = useRouter();
   const { isAdmin, owner, isConnected, loading } = useIsOrgAdmin(org.registrar);
 
   if (!loading && !isAdmin) {
@@ -49,7 +47,10 @@ function RegisterAgent({ org }: { org: OrgWithVault }) {
       <Card padding="lg" className="mt-6">
         <RegisterAgentForm
           org={org}
-          onDone={() => router.push(`/org/${encodeURIComponent(org.orgEnsName)}`)}
+          // A real browser navigation, not `router.push` — see onboard/page.tsx's matching
+          // NatSpec: the target route can be stuck in Next's client router cache from an
+          // earlier failed prefetch, which makes a soft navigation here hang indefinitely.
+          onDone={() => window.location.assign(`/org/${encodeURIComponent(org.orgEnsName)}`)}
         />
       </Card>
     </div>

@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import {
   useAccount,
   useBalance,
@@ -61,7 +60,6 @@ function storageKey(address?: string) {
  * the dashboard with a live agent already in the tree.
  */
 export default function OnboardPage() {
-  const router = useRouter();
   const { address, chainId } = useAccount();
   const { switchChainAsync } = useSwitchChain();
   const sepoliaClient = usePublicClient({ chainId: sepolia.id });
@@ -151,10 +149,16 @@ export default function OnboardPage() {
   const activeIndex = TIMELINE.findIndex((s) => s.id === step);
 
   useEffect(() => {
+    // A real browser navigation, not `router.replace` — the wizard's own polling (`useOrgs`,
+    // `useMandateGraph`) can leave Next's client router cache holding a stuck or errored entry for
+    // this exact URL from an earlier prefetch, which makes `router.replace` silently hang: the page
+    // stays on "Registering…" forever with a mandate that's already live on-chain, recoverable only
+    // by closing the tab and reopening it — found live, not theorized. A full navigation can't get
+    // stuck the same way; the one extra page load is invisible at the end of a multi-step wizard.
     if (org && org.vault && agentIssued) {
-      router.replace(`/org/${encodeURIComponent(org.orgEnsName)}`);
+      window.location.assign(`/org/${encodeURIComponent(org.orgEnsName)}`);
     }
-  }, [org, agentIssued, router]);
+  }, [org, agentIssued]);
 
   if (!orgFactory) {
     return (
@@ -221,7 +225,7 @@ export default function OnboardPage() {
             <RegisterAgentForm
               org={org}
               submitLabel="Register agent"
-              onDone={() => router.replace(`/org/${encodeURIComponent(org.orgEnsName)}`)}
+              onDone={() => window.location.assign(`/org/${encodeURIComponent(org.orgEnsName)}`)}
             />
           </Card>
         </div>
