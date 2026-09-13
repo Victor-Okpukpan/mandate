@@ -1,6 +1,8 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import Link from "next/link";
+import { useAccount } from "wagmi";
 import { motion } from "motion/react";
 import { Button } from "@mandate/ui/components/Button";
 import { Card } from "@mandate/ui/components/Card";
@@ -16,9 +18,21 @@ import { useOrgs } from "@/lib/useOrgs";
  * directory of orgs... the 'authority is a public lookup' thesis made visible at the top level" —
  * before self-serve onboarding existed, `/` was one org's own dashboard; now it's the index that
  * lets a visitor find (or create) theirs.
+ *
+ * Every org here stays visible to everyone, deliberately — that's the whole point of a public,
+ * ENS-based authority record, not an oversight to lock down. The "Mine" filter below is purely a
+ * client-side convenience for an admin with several orgs to find their own faster; it changes
+ * nothing about who can see or read what.
  */
 export default function OrgDirectoryPage() {
   const { orgs, loading, factoryConfigured } = useOrgs();
+  const { address } = useAccount();
+  const [mineOnly, setMineOnly] = useState(false);
+
+  const visibleOrgs = useMemo(() => {
+    if (!mineOnly || !address) return orgs;
+    return orgs.filter((org) => org.admin.toLowerCase() === address.toLowerCase());
+  }, [orgs, mineOnly, address]);
 
   return (
     <div className="mx-auto max-w-4xl px-6 py-10 sm:py-14">
@@ -37,10 +51,33 @@ export default function OrgDirectoryPage() {
             issue a mandate under it. Connect a wallet, pick a name, and yours joins this list.
           </Lede>
         </motion.div>
-        <motion.div variants={fadeUp} className="mt-6">
+        <motion.div variants={fadeUp} className="mt-6 flex flex-wrap items-center gap-4">
           <Link href="/onboard">
             <Button>Create an organisation →</Button>
           </Link>
+          {!loading && orgs.length > 0 ? (
+            <div className="inline-flex rounded-lg border border-border-subtle p-0.5">
+              {(
+                [
+                  ["all", "All"],
+                  ["mine", "Mine"],
+                ] as const
+              ).map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setMineOnly(id === "mine")}
+                  disabled={id === "mine" && !address}
+                  title={id === "mine" && !address ? "Connect a wallet to filter to your own orgs" : undefined}
+                  className={`rounded-md px-3 py-1.5 text-[12.5px] font-medium transition-colors disabled:pointer-events-none disabled:opacity-40 ${
+                    (id === "mine") === mineOnly ? "bg-surface-2 text-primary" : "text-tertiary hover:text-secondary"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          ) : null}
         </motion.div>
       </motion.div>
 
@@ -66,9 +103,17 @@ export default function OrgDirectoryPage() {
             <p className="text-[14px] font-medium text-primary">No organisations yet</p>
             <p className="mt-2 text-[13px] text-tertiary">Be the first — it takes one wallet and one name.</p>
           </Card>
+        ) : visibleOrgs.length === 0 ? (
+          <Card padding="lg" className="border-dashed text-center">
+            <p className="text-[14px] font-medium text-primary">You don&rsquo;t administer any organisations</p>
+            <p className="mt-2 text-[13px] text-tertiary">
+              None of the {orgs.length} organisation{orgs.length === 1 ? "" : "s"} here have this
+              wallet as their admin.
+            </p>
+          </Card>
         ) : (
           <motion.div variants={stagger(0.05)} initial="hidden" animate="visible" className="grid gap-4 sm:grid-cols-2">
-            {orgs.map((org) => (
+            {visibleOrgs.map((org) => (
               <motion.div key={org.registrar} variants={fadeUp}>
                 <Link href={`/org/${org.orgEnsName}`} className="block h-full">
                   <Card padding="lg" className="h-full transition-shadow duration-300 hover:shadow-md">
